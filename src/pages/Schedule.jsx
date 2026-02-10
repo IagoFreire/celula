@@ -53,7 +53,8 @@ export default function Schedule() {
   };
 
   const formatDate = (dateStr) => {
-    const date = new Date(dateStr + 'T00:00:00');
+    const datePart = typeof dateStr === 'string' ? dateStr.split('T')[0] : dateStr;
+    const date = new Date(datePart + 'T00:00:00');
     const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     return { dayName: days[date.getDay()], day: date.getDate(), month: months[date.getMonth()] };
