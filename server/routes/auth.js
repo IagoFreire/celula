@@ -1,0 +1,82 @@
+import { Router } from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { db } from '../database.js';
+import { JWT_SECRET, authenticateToken } from '../middleware/auth.js';
+
+const router = Router();
+
+// Login
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+    }
+
+    const user = await db.findUserByEmail(email);
+    if (!user || !bcrypt.compareSync(password, user.password)) {
+      return res.status(401).json({ error: 'Credenciais inválidas' });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, name: user.name, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Registro
+router.post('/register', async (req, res) => {
+  try {
+    const { name, email, password, phone } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
+    }
+
+    if (await db.findUserByEmail(email)) {
+      return res.status(409).json({ error: 'Email já cadastrado' });
+    }
+
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    const user = await db.createUser({ name, email, password: hashedPassword, phone, role: 'member' });
+
+    const token = jwt.sign(
+      { id: user.id, name, email, role: 'member' },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.status(201).json({
+      token,
+      user: { id: user.id, name, email, role: 'member' },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Dados do usuário logado
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const user = await db.findUserById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+    const { password, ...safeUser } = user;
+    res.json(safeUser);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+export default router;
