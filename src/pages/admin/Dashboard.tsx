@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
+import type { LucideIcon } from 'lucide-react';
 import {
   Users,
   Calendar,
-  DollarSign,
   BookOpen,
   TrendingUp,
   TrendingDown,
@@ -13,8 +13,29 @@ import {
   Wallet,
 } from 'lucide-react';
 
+interface DashboardStats {
+  totalMembers: number;
+  upcomingSchedules: number;
+  totalStudies: number;
+  income: number;
+  expense: number;
+  balance: number;
+}
+
+interface DashboardCard {
+  title: string;
+  value: number | string;
+  icon: LucideIcon;
+  color: string;
+  bg: string;
+  shadow: string;
+  link: string;
+  gradient: string;
+  borderColor: string;
+}
+
 export default function Dashboard() {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { loadStats(); }, []);
@@ -37,17 +58,17 @@ export default function Dashboard() {
     finally { setLoading(false); }
   };
 
-  const formatCurrency = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+  const formatCurrency = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 
   if (loading) {
     return <div className="flex items-center justify-center py-20"><div className="spinner w-8 h-8" /></div>;
   }
 
-  const cards = [
+  const cards: DashboardCard[] = [
     { title: 'Membros', value: stats?.totalMembers || 0, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10', shadow: 'shadow-[0_2px_10px_rgba(59,130,246,0.12)]', link: '/admin/membros', gradient: 'stat-gradient-blue', borderColor: 'rgba(59,130,246,0.15)' },
     { title: 'Próximas Reuniões', value: stats?.upcomingSchedules || 0, icon: Calendar, color: 'text-gold-400', bg: 'bg-gold-500/10', shadow: 'shadow-[0_2px_10px_rgba(217,115,26,0.12)]', link: '/admin/cronogramas', gradient: 'stat-gradient-gold', borderColor: 'rgba(217,115,26,0.15)' },
     { title: 'Estudos', value: stats?.totalStudies || 0, icon: BookOpen, color: 'text-accent-400', bg: 'bg-accent-500/10', shadow: 'shadow-[0_2px_10px_rgba(191,36,122,0.12)]', link: '/admin/estudos', gradient: 'stat-gradient-accent', borderColor: 'rgba(191,36,122,0.15)' },
-    { title: 'Saldo', value: formatCurrency(stats?.balance), icon: Wallet, color: stats?.balance >= 0 ? 'text-emerald-400' : 'text-red-400', bg: stats?.balance >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10', shadow: stats?.balance >= 0 ? 'shadow-[0_2px_10px_rgba(16,185,129,0.12)]' : 'shadow-[0_2px_10px_rgba(239,68,68,0.12)]', link: '/admin/financas', gradient: stats?.balance >= 0 ? 'stat-gradient-green' : 'stat-gradient-red', borderColor: stats?.balance >= 0 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)' },
+    { title: 'Saldo', value: formatCurrency(stats?.balance ?? 0), icon: Wallet, color: (stats?.balance ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400', bg: (stats?.balance ?? 0) >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10', shadow: (stats?.balance ?? 0) >= 0 ? 'shadow-[0_2px_10px_rgba(16,185,129,0.12)]' : 'shadow-[0_2px_10px_rgba(239,68,68,0.12)]', link: '/admin/financas', gradient: (stats?.balance ?? 0) >= 0 ? 'stat-gradient-green' : 'stat-gradient-red', borderColor: (stats?.balance ?? 0) >= 0 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)' },
   ];
 
   return (
@@ -62,7 +83,7 @@ export default function Dashboard() {
 
       {/* Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {cards.map((card, i) => (
+        {cards.map((card) => (
           <Link
             key={card.title}
             to={card.link}
@@ -90,7 +111,7 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-sm text-dark-500">Total Entradas</p>
-              <p className="text-2xl font-extrabold text-emerald-400">{formatCurrency(stats?.income)}</p>
+              <p className="text-2xl font-extrabold text-emerald-400">{formatCurrency(stats?.income ?? 0)}</p>
             </div>
           </div>
         </div>
@@ -102,7 +123,7 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-sm text-dark-500">Total Saídas</p>
-              <p className="text-2xl font-extrabold text-red-400">{formatCurrency(stats?.expense)}</p>
+              <p className="text-2xl font-extrabold text-red-400">{formatCurrency(stats?.expense ?? 0)}</p>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -19,14 +19,14 @@ export default function Register() {
 
   if (user) return <Navigate to="/cronograma" replace />;
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     if (password !== confirmPassword) { setError('As senhas não coincidem'); return; }
     if (password.length < 6) { setError('A senha deve ter pelo menos 6 caracteres'); return; }
     setLoading(true);
     try { await register(name, email, password, phone); }
-    catch (err) { setError(err.message); }
+    catch (err) { setError((err as Error).message); }
     finally { setLoading(false); }
   };
 

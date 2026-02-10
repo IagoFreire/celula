@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
+import type { Study } from '../types';
 import {
   BookOpen,
   Search,
@@ -14,12 +15,12 @@ import {
 } from 'lucide-react';
 
 export default function Studies() {
-  const [studies, setStudies] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [studies, setStudies] = useState<Study[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedStudy, setSelectedStudy] = useState(null);
+  const [selectedStudy, setSelectedStudy] = useState<Study | null>(null);
 
   useEffect(() => { loadCategories(); }, []);
   useEffect(() => { loadStudies(); }, [search, selectedCategory]);
@@ -31,7 +32,7 @@ export default function Studies() {
   const loadStudies = async () => {
     try {
       setLoading(true);
-      const params = {};
+      const params: Record<string, string> = {};
       if (search) params.search = search;
       if (selectedCategory) params.category = selectedCategory;
       setStudies(await api.getStudies(params));
@@ -39,7 +40,7 @@ export default function Studies() {
     finally { setLoading(false); }
   };
 
-  const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('pt-BR');
+  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('pt-BR');
 
   return (
     <div>
@@ -90,7 +91,7 @@ export default function Studies() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {studies.map((study, i) => (
+          {studies.map((study) => (
             <div
               key={study.id}
               className="card-hover cursor-pointer group stagger-item"

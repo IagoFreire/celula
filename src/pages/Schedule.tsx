@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
+import type { Schedule as ScheduleType } from '../types';
 import {
   Calendar,
   MapPin,
@@ -9,15 +10,13 @@ import {
   Circle,
   BookOpen,
   Users,
-  Loader2,
-  Sparkles,
 } from 'lucide-react';
 
 export default function Schedule() {
-  const [schedules, setSchedules] = useState([]);
+  const [schedules, setSchedules] = useState<ScheduleType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [confirmingId, setConfirmingId] = useState(null);
-  const [attendanceMap, setAttendanceMap] = useState({});
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [attendanceMap, setAttendanceMap] = useState<Record<number, boolean>>({});
 
   useEffect(() => { loadData(); }, []);
 
@@ -29,14 +28,14 @@ export default function Schedule() {
         api.getMyAttendance(),
       ]);
       setSchedules(schedulesData);
-      const map = {};
+      const map: Record<number, boolean> = {};
       myAttendance.forEach((a) => { map[a.schedule_id] = true; });
       setAttendanceMap(map);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
 
-  const toggleAttendance = async (scheduleId) => {
+  const toggleAttendance = async (scheduleId: number) => {
     setConfirmingId(scheduleId);
     try {
       if (attendanceMap[scheduleId]) {
@@ -52,7 +51,7 @@ export default function Schedule() {
     finally { setConfirmingId(null); }
   };
 
-  const formatDate = (dateStr) => {
+  const formatDate = (dateStr: string) => {
     const datePart = typeof dateStr === 'string' ? dateStr.split('T')[0] : dateStr;
     const date = new Date(datePart + 'T00:00:00');
     const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -86,7 +85,7 @@ export default function Schedule() {
         </div>
       ) : (
         <div className="space-y-4">
-          {schedules.map((schedule, index) => {
+          {schedules.map((schedule) => {
             const date = formatDate(schedule.date);
             const isConfirmed = attendanceMap[schedule.id];
             const isConfirming = confirmingId === schedule.id;

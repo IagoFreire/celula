@@ -381,6 +381,42 @@
   border-radius: 0 0 999px 999px;
 }
 
+/* ===== LIGHT THEME: Remove glass effect, use solid gradients ===== */
+[data-theme="light"] .card,
+[data-theme="light"] .card-hover,
+[data-theme="light"] .card-gradient {
+  background: rgb(var(--dark-925));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+[data-theme="light"] .card-hover:hover {
+  background: rgb(var(--dark-925));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+[data-theme="light"] .card-glass {
+  background: rgb(var(--dark-925));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+[data-theme="light"] .glass {
+  background: rgb(var(--dark-925));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+[data-theme="light"] .stat-gradient-green,
+[data-theme="light"] .stat-gradient-red,
+[data-theme="light"] .stat-gradient-gold,
+[data-theme="light"] .stat-gradient-blue,
+[data-theme="light"] .stat-gradient-accent {
+  background: rgb(var(--dark-925));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+[data-theme="light"] .btn-primary {
+  color: #ffffff;
+}
+
 /* Theme transition on all themed elements */
 [data-theme] .card,
 [data-theme] .card-hover,

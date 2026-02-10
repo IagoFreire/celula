@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -16,12 +16,12 @@ export default function Login() {
 
   if (user) return <Navigate to="/cronograma" replace />;
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try { await login(email, password); }
-    catch (err) { setError(err.message); }
+    catch (err) { setError((err as Error).message); }
     finally { setLoading(false); }
   };
 

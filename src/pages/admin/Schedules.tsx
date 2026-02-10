@@ -1,19 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { api } from '../../api';
+import type { Schedule, Cell, Member, Study, ScheduleForm } from '../../types';
 import {
   Plus, Pencil, Trash2, Calendar, Clock, MapPin, User, Users, X, Save, Eye, CalendarDays,
 } from 'lucide-react';
 
 export default function AdminSchedules() {
-  const [schedules, setSchedules] = useState([]);
-  const [cells, setCells] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [studies, setStudies] = useState([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [cells, setCells] = useState<Cell[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [studies, setStudies] = useState<Study[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [viewingSchedule, setViewingSchedule] = useState(null);
-  const [form, setForm] = useState({ cell_id: '', title: '', date: '', time: '', location: '', leader_id: '', study_id: '', notes: '' });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [viewingSchedule, setViewingSchedule] = useState<Schedule | null>(null);
+  const [form, setForm] = useState<ScheduleForm>({ cell_id: '', title: '', date: '', time: '', location: '', leader_id: '', study_id: '', notes: '' });
 
   useEffect(() => { loadData(); }, []);
 
@@ -27,26 +28,26 @@ export default function AdminSchedules() {
 
   const resetForm = () => { setForm({ cell_id: '', title: '', date: '', time: '', location: '', leader_id: '', study_id: '', notes: '' }); setEditingId(null); setShowForm(false); };
 
-  const openEdit = (s) => {
-    setForm({ cell_id: s.cell_id || '', title: s.title, date: s.date, time: s.time, location: s.location, leader_id: s.leader_id || '', study_id: s.study_id || '', notes: s.notes || '' });
+  const openEdit = (s: Schedule) => {
+    setForm({ cell_id: s.cell_id?.toString() || '', title: s.title, date: s.date, time: s.time, location: s.location, leader_id: s.leader_id?.toString() || '', study_id: s.study_id?.toString() || '', notes: s.notes || '' });
     setEditingId(s.id); setShowForm(true);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
       const data = { ...form, cell_id: form.cell_id || null, leader_id: form.leader_id || null, study_id: form.study_id || null };
       if (editingId) await api.updateSchedule(editingId, data);
       else await api.createSchedule(data);
       resetForm(); loadData();
-    } catch (err) { alert(err.message); }
+    } catch (err) { alert((err as Error).message); }
   };
 
-  const handleDelete = async (id) => { if (!confirm('Deseja excluir esta reunião?')) return; try { await api.deleteSchedule(id); loadData(); } catch (err) { alert(err.message); } };
+  const handleDelete = async (id: number) => { if (!confirm('Deseja excluir esta reunião?')) return; try { await api.deleteSchedule(id); loadData(); } catch (err) { alert((err as Error).message); } };
 
-  const viewAttendees = async (id) => { try { setViewingSchedule(await api.getSchedule(id)); } catch (err) { console.error(err); } };
+  const viewAttendees = async (id: number) => { try { setViewingSchedule(await api.getSchedule(id)); } catch (err) { console.error(err); } };
 
-  const formatDate = (d) => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR');
+  const formatDate = (d: string) => { const datePart = typeof d === 'string' ? d.split('T')[0] : d; return new Date(datePart + 'T00:00:00').toLocaleDateString('pt-BR'); };
 
   if (loading) return <div className="flex items-center justify-center py-20"><div className="spinner w-8 h-8" /></div>;
 

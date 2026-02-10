@@ -1,26 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { api } from '../../api';
+import type { Study, StudyForm } from '../../types';
 import {
   Plus, Pencil, Trash2, FileText, Upload, X, Save, Search, Tag, Download, BookOpen, Library,
 } from 'lucide-react';
 
 export default function AdminStudyLibrary() {
-  const [studies, setStudies] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [studies, setStudies] = useState<Study[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
-  const [file, setFile] = useState(null);
-  const [form, setForm] = useState({ title: '', description: '', content: '', category: '', keywords: '' });
+  const [file, setFile] = useState<File | null>(null);
+  const [form, setForm] = useState<StudyForm>({ title: '', description: '', content: '', category: '', keywords: '' });
 
   useEffect(() => { loadData(); }, [search, filterCategory]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const params = {};
+      const params: Record<string, string> = {};
       if (search) params.search = search;
       if (filterCategory) params.category = filterCategory;
       const [s, c] = await Promise.all([api.getStudies(params), api.getStudyCategories()]);
@@ -29,9 +30,9 @@ export default function AdminStudyLibrary() {
   };
 
   const resetForm = () => { setForm({ title: '', description: '', content: '', category: '', keywords: '' }); setFile(null); setEditingId(null); setShowForm(false); };
-  const openEdit = (s) => { setForm({ title: s.title, description: s.description || '', content: s.content || '', category: s.category || '', keywords: s.keywords || '' }); setEditingId(s.id); setFile(null); setShowForm(true); };
+  const openEdit = (s: Study) => { setForm({ title: s.title, description: s.description || '', content: s.content || '', category: s.category || '', keywords: s.keywords || '' }); setEditingId(s.id); setFile(null); setShowForm(true); };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
       const formData = new FormData();
@@ -39,11 +40,15 @@ export default function AdminStudyLibrary() {
       if (file) formData.append('file', file);
       if (editingId) await api.updateStudy(editingId, formData); else await api.createStudy(formData);
       resetForm(); loadData();
-    } catch (err) { alert(err.message); }
+    } catch (err) { alert((err as Error).message); }
   };
 
-  const handleDelete = async (id) => { if (!confirm('Excluir este estudo?')) return; try { await api.deleteStudy(id); loadData(); } catch (err) { alert(err.message); } };
-  const fmtDate = (d) => new Date(d).toLocaleDateString('pt-BR');
+  const handleDelete = async (id: number) => { if (!confirm('Excluir este estudo?')) return; try { await api.deleteStudy(id); loadData(); } catch (err) { alert((err as Error).message); } };
+  const fmtDate = (d: string) => new Date(d).toLocaleDateString('pt-BR');
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setFile(e.target.files?.[0] || null);
+  };
 
   if (loading && studies.length === 0) return <div className="flex items-center justify-center py-20"><div className="spinner w-8 h-8" /></div>;
 
@@ -89,9 +94,9 @@ export default function AdminStudyLibrary() {
                   background: 'linear-gradient(135deg, rgba(191,36,122,0.04), rgba(217,115,26,0.03))',
                   boxShadow: 'inset 0 0 0 2px rgba(76,68,130,0.3)',
                 }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = 'inset 0 0 0 2px rgba(217,115,26,0.3), 0 0 20px rgba(217,115,26,0.08)'}
-                onMouseLeave={e => e.currentTarget.style.boxShadow = 'inset 0 0 0 2px rgba(76,68,130,0.3)'}>
-                <input type="file" onChange={(e) => setFile(e.target.files[0])} accept=".pdf,.doc,.docx,.txt" className="hidden" id="file-upload" />
+                onMouseEnter={e => (e.currentTarget.style.boxShadow = 'inset 0 0 0 2px rgba(217,115,26,0.3), 0 0 20px rgba(217,115,26,0.08)')}
+                onMouseLeave={e => (e.currentTarget.style.boxShadow = 'inset 0 0 0 2px rgba(76,68,130,0.3)')}>
+                <input type="file" onChange={handleFileChange} accept=".pdf,.doc,.docx,.txt" className="hidden" id="file-upload" />
                 <label htmlFor="file-upload" className="cursor-pointer">
                   <Upload className="w-8 h-8 text-dark-600 mx-auto mb-2 group-hover:text-gold-500 transition-colors" />
                   <p className="text-sm text-dark-500">{file ? file.name : 'Clique para selecionar'}</p>

@@ -5,7 +5,14 @@ import { useTheme } from '../contexts/ThemeContext';
 import {
   Calendar, BookOpen, LayoutDashboard, DollarSign, Users, Library,
   LogOut, Menu, X, Church, CalendarDays, Sparkles, Sun, Moon,
+  type LucideIcon,
 } from 'lucide-react';
+
+interface NavItemProps {
+  to: string;
+  icon: LucideIcon;
+  label: string;
+}
 
 export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
@@ -16,11 +23,11 @@ export default function Layout() {
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
-  const memberLinks = [
+  const memberLinks: NavItemProps[] = [
     { to: '/cronograma', icon: Calendar, label: 'Cronograma' },
     { to: '/estudos', icon: BookOpen, label: 'Estudos' },
   ];
-  const adminLinks = [
+  const adminLinks: NavItemProps[] = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/admin/cronogramas', icon: CalendarDays, label: 'Cronogramas' },
     { to: '/admin/financas', icon: DollarSign, label: 'Finanças' },
@@ -28,7 +35,7 @@ export default function Layout() {
     { to: '/admin/membros', icon: Users, label: 'Membros' },
   ];
 
-  const NavItem = ({ to, icon: Icon, label }) => (
+  const NavItem = ({ to, icon: Icon, label }: NavItemProps) => (
     <NavLink
       to={to}
       end={to === '/admin'}

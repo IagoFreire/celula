@@ -1,37 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { api } from '../../api';
+import type { Member, MemberForm } from '../../types';
 import {
-  Users, Pencil, Trash2, X, Save, Search, User, Mail, Phone, Shield, Calendar,
+  Users, Pencil, Trash2, X, Save, Search, Mail, Phone, Shield, Calendar,
   CheckCircle2, ChevronRight,
 } from 'lucide-react';
 
 export default function AdminMembers() {
-  const [members, setMembers] = useState([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [selectedMember, setSelectedMember] = useState(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', phone: '', role: 'member' });
+  const [form, setForm] = useState<MemberForm>({ name: '', email: '', phone: '', role: 'member' });
 
   useEffect(() => { loadMembers(); }, []);
 
   const loadMembers = async () => { try { setLoading(true); setMembers(await api.getMembers()); } catch (err) { console.error(err); } finally { setLoading(false); } };
 
-  const openEdit = (m) => { setForm({ name: m.name, email: m.email, phone: m.phone || '', role: m.role }); setEditingId(m.id); };
+  const openEdit = (m: Member) => { setForm({ name: m.name, email: m.email, phone: m.phone || '', role: m.role }); setEditingId(m.id); };
   const cancelEdit = () => { setEditingId(null); setForm({ name: '', email: '', phone: '', role: 'member' }); };
 
-  const handleUpdate = async (e) => { e.preventDefault(); try { await api.updateMember(editingId, form); cancelEdit(); loadMembers(); } catch (err) { alert(err.message); } };
+  const handleUpdate = async (e: FormEvent) => { e.preventDefault(); try { if (editingId) await api.updateMember(editingId, { ...form }); cancelEdit(); loadMembers(); } catch (err) { alert((err as Error).message); } };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: number) => {
     if (!confirm('Excluir este membro?')) return;
     try { await api.deleteMember(id); loadMembers(); if (selectedMember?.id === id) setSelectedMember(null); }
-    catch (err) { alert(err.message); }
+    catch (err) { alert((err as Error).message); }
   };
 
-  const viewDetails = async (id) => { try { setLoadingDetails(true); setSelectedMember(await api.getMember(id)); } catch (err) { console.error(err); } finally { setLoadingDetails(false); } };
+  const viewDetails = async (id: number) => { try { setLoadingDetails(true); setSelectedMember(await api.getMember(id)); } catch (err) { console.error(err); } finally { setLoadingDetails(false); } };
 
-  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('pt-BR') : '-';
+  const fmtDate = (d: string | undefined) => d ? new Date(d).toLocaleDateString('pt-BR') : '-';
 
   const filteredMembers = members.filter((m) =>
     m.name.toLowerCase().includes(search.toLowerCase()) ||

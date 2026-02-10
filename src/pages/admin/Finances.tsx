@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { api } from '../../api';
+import type { Finance, FinanceSummary, Cell, FinanceFilters, FinanceForm } from '../../types';
 import {
   Plus, Pencil, Trash2, DollarSign, TrendingUp, TrendingDown, Wallet, X, Save,
   Filter, ArrowUpCircle, ArrowDownCircle,
@@ -9,21 +10,21 @@ const INCOME_CATEGORIES = ['Oferta', 'Dízimo', 'Doação', 'Evento', 'Outros'];
 const EXPENSE_CATEGORIES = ['Aluguel', 'Material', 'Alimentação', 'Transporte', 'Manutenção', 'Outros'];
 
 export default function AdminFinances() {
-  const [transactions, setTransactions] = useState([]);
-  const [summary, setSummary] = useState(null);
-  const [cells, setCells] = useState([]);
+  const [transactions, setTransactions] = useState<Finance[]>([]);
+  const [summary, setSummary] = useState<FinanceSummary | null>(null);
+  const [cells, setCells] = useState<Cell[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [filters, setFilters] = useState({ cell_id: '', type: '', start_date: '', end_date: '' });
-  const [form, setForm] = useState({ cell_id: '', type: 'income', category: '', amount: '', description: '', date: '' });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [filters, setFilters] = useState<FinanceFilters>({ cell_id: '', type: '', start_date: '', end_date: '' });
+  const [form, setForm] = useState<FinanceForm>({ cell_id: '', type: 'income', category: '', amount: '', description: '', date: '' });
 
   useEffect(() => { loadData(); }, [filters]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const params = {};
+      const params: Record<string, string> = {};
       Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
       const [t, s, c] = await Promise.all([api.getFinances(params), api.getFinanceSummary(params), api.getCells()]);
       setTransactions(t); setSummary(s); setCells(c);
@@ -31,21 +32,21 @@ export default function AdminFinances() {
   };
 
   const resetForm = () => { setForm({ cell_id: '', type: 'income', category: '', amount: '', description: '', date: '' }); setEditingId(null); setShowForm(false); };
-  const openEdit = (t) => { setForm({ cell_id: t.cell_id || '', type: t.type, category: t.category, amount: t.amount, description: t.description || '', date: t.date }); setEditingId(t.id); setShowForm(true); };
+  const openEdit = (t: Finance) => { setForm({ cell_id: t.cell_id?.toString() || '', type: t.type, category: t.category, amount: t.amount.toString(), description: t.description || '', date: t.date }); setEditingId(t.id); setShowForm(true); };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
       const data = { ...form, cell_id: form.cell_id || null, amount: parseFloat(form.amount) };
       if (editingId) await api.updateFinance(editingId, data); else await api.createFinance(data);
       resetForm(); loadData();
-    } catch (err) { alert(err.message); }
+    } catch (err) { alert((err as Error).message); }
   };
 
-  const handleDelete = async (id) => { if (!confirm('Excluir transação?')) return; try { await api.deleteFinance(id); loadData(); } catch (err) { alert(err.message); } };
+  const handleDelete = async (id: number) => { if (!confirm('Excluir transação?')) return; try { await api.deleteFinance(id); loadData(); } catch (err) { alert((err as Error).message); } };
 
-  const fmt = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
-  const fmtDate = (d) => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR');
+  const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+  const fmtDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR');
   const categories = form.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
   if (loading && !summary) return <div className="flex items-center justify-center py-20"><div className="spinner w-8 h-8" /></div>;
@@ -66,17 +67,17 @@ export default function AdminFinances() {
       <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="card stat-gradient-green text-center">
           <TrendingUp className="w-5 h-5 text-emerald-400 mx-auto mb-2" />
-          <p className="text-lg sm:text-xl font-extrabold text-emerald-400">{fmt(summary?.income)}</p>
+          <p className="text-lg sm:text-xl font-extrabold text-emerald-400">{fmt(summary?.income ?? 0)}</p>
           <p className="text-xs text-dark-500 mt-0.5">Entradas</p>
         </div>
         <div className="card stat-gradient-red text-center">
           <TrendingDown className="w-5 h-5 text-red-400 mx-auto mb-2" />
-          <p className="text-lg sm:text-xl font-extrabold text-red-400">{fmt(summary?.expense)}</p>
+          <p className="text-lg sm:text-xl font-extrabold text-red-400">{fmt(summary?.expense ?? 0)}</p>
           <p className="text-xs text-dark-500 mt-0.5">Saídas</p>
         </div>
         <div className="card stat-gradient-gold text-center">
           <Wallet className="w-5 h-5 text-gold-400 mx-auto mb-2" />
-          <p className={`text-lg sm:text-xl font-extrabold ${summary?.balance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmt(summary?.balance)}</p>
+          <p className={`text-lg sm:text-xl font-extrabold ${(summary?.balance ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmt(summary?.balance ?? 0)}</p>
           <p className="text-xs text-dark-500 mt-0.5">Saldo</p>
         </div>
       </div>
@@ -144,7 +145,7 @@ export default function AdminFinances() {
       )}
 
       {/* By Category */}
-      {summary?.byCategory?.length > 0 && (
+      {summary?.byCategory && summary.byCategory.length > 0 && (
         <div className="card mt-6 animate-fade-in-up">
           <h3 className="font-bold text-dark-50 mb-4">Resumo por Categoria</h3>
           <div className="space-y-2">

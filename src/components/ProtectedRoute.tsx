@@ -1,7 +1,13 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import type { ReactNode } from 'react';
 
-export default function ProtectedRoute({ children, requireAdmin }) {
+interface ProtectedRouteProps {
+  children?: ReactNode;
+  requireAdmin?: boolean;
+}
+
+export default function ProtectedRoute({ children, requireAdmin }: ProtectedRouteProps) {
   const { user, isAdmin } = useAuth();
 
   if (!user) {
@@ -12,5 +18,5 @@ export default function ProtectedRoute({ children, requireAdmin }) {
     return <Navigate to="/cronograma" replace />;
   }
 
-  return children;
+  return <>{children}</>;
 }
