@@ -1,0 +1,60 @@
+name: 🚀 Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📂 Checkout do Código
+        uses: actions/checkout@v4
+
+      - name: 🟢 Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 🏗️ Build do Frontend (No GitHub)
+        run: |
+          npm install
+          npm run build 
+
+      - name: 📦 Enviar Frontend (dist) via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          source: "dist/"
+          target: "/var/www/app/celula"
+
+      - name: ⚡ Atualizar e Buildar Backend via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script: |
+            # Entrar na pasta do projeto
+            cd /var/www/app/celula
+            
+            echo "📥 Puxando código novo do Git..."
+            git pull origin ${{ github.ref_name }}
+
+            echo "⚙️ Configurando Backend..."
+            cd server
+            
+            export NODE_OPTIONS="--max-old-space-size=400"
+            
+            echo "📦 Instalando dependências..."
+            npm install
+            
+            echo "🏗️ Compilando TypeScript..."
+            npm run build
+            
+            echo "🔄 Reiniciando PM2..."
+            pm2 restart api3 --update-env || pm2 start npm --name api3 -- start
+            pm2 save
