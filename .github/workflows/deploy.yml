@@ -41,9 +41,15 @@ jobs:
             # Entrar na pasta do projeto
             cd /var/www/app/celula
             
+            echo "💾 Salvando .env..."
+            cp .env /tmp/.env.backup 2>/dev/null || true
+            
             echo "📥 Puxando código novo do Git..."
             git fetch origin ${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
+            
+            echo "♻️ Restaurando .env..."
+            cp /tmp/.env.backup .env 2>/dev/null || true
 
             echo "⚙️ Configurando Backend..."
             cd server
