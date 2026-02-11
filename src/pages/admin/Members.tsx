@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { api } from '../../api';
 import type { Member, MemberForm } from '../../types';
 import {
-  Users, Pencil, Trash2, X, Save, Search, Mail, Phone, Shield, Calendar,
+  Users, Pencil, Trash2, X, Save, Search, Phone, Shield, Calendar,
   CheckCircle2, ChevronRight,
 } from 'lucide-react';
 
@@ -13,14 +13,14 @@ export default function AdminMembers() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  const [form, setForm] = useState<MemberForm>({ name: '', email: '', phone: '', role: 'member' });
+  const [form, setForm] = useState<MemberForm>({ name: '', phone: '', role: 'member' });
 
   useEffect(() => { loadMembers(); }, []);
 
   const loadMembers = async () => { try { setLoading(true); setMembers(await api.getMembers()); } catch (err) { console.error(err); } finally { setLoading(false); } };
 
-  const openEdit = (m: Member) => { setForm({ name: m.name, email: m.email, phone: m.phone || '', role: m.role }); setEditingId(m.id); };
-  const cancelEdit = () => { setEditingId(null); setForm({ name: '', email: '', phone: '', role: 'member' }); };
+  const openEdit = (m: Member) => { setForm({ name: m.name, phone: m.phone || '', role: m.role }); setEditingId(m.id); };
+  const cancelEdit = () => { setEditingId(null); setForm({ name: '', phone: '', role: 'member' }); };
 
   const handleUpdate = async (e: FormEvent) => { e.preventDefault(); try { if (editingId) await api.updateMember(editingId, { ...form }); cancelEdit(); loadMembers(); } catch (err) { alert((err as Error).message); } };
 
@@ -36,7 +36,7 @@ export default function AdminMembers() {
 
   const filteredMembers = members.filter((m) =>
     m.name.toLowerCase().includes(search.toLowerCase()) ||
-    m.email.toLowerCase().includes(search.toLowerCase())
+    (m.phone || '').includes(search)
   );
 
   if (loading) return <div className="flex items-center justify-center py-20"><div className="spinner w-8 h-8" /></div>;
@@ -51,7 +51,7 @@ export default function AdminMembers() {
       {/* Search */}
       <div className="relative mb-6 animate-fade-in-down">
         <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-dark-500" />
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nome ou email..." className="input-field pl-10" />
+        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nome ou celular..." className="input-field pl-10" />
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
@@ -68,8 +68,7 @@ export default function AdminMembers() {
                       <form onSubmit={handleUpdate} className="space-y-3">
                         <div className="grid sm:grid-cols-2 gap-3">
                           <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" placeholder="Nome" required />
-                          <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" placeholder="Email" required />
-                          <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input-field" placeholder="Telefone" />
+                          <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input-field" placeholder="Celular" required />
                           <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="input-field"><option value="member">Membro</option><option value="admin">Administrador</option></select>
                         </div>
                         <div className="flex gap-2"><button type="submit" className="btn-primary text-sm"><Save className="w-4 h-4" />Salvar</button><button type="button" onClick={cancelEdit} className="btn-secondary text-sm">Cancelar</button></div>
@@ -89,7 +88,7 @@ export default function AdminMembers() {
                             <span className="font-semibold text-dark-50 text-sm truncate">{m.name}</span>
                             {m.role === 'admin' && <span className="badge-gold text-[10px]"><Shield className="w-2.5 h-2.5 mr-0.5" />Admin</span>}
                           </div>
-                          <p className="text-xs text-dark-500 truncate">{m.email}</p>
+                          <p className="text-xs text-dark-500 truncate">{m.phone || '—'}</p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className="text-xs text-dark-600 hidden sm:block">{m.total_attendance} presenças</span>
@@ -129,8 +128,7 @@ export default function AdminMembers() {
                   </div>
 
                   <div className="space-y-2.5 mb-6">
-                    <div className="flex items-center gap-2.5 text-sm text-dark-400"><Mail className="w-4 h-4 text-gold-600" /><span className="truncate">{selectedMember.email}</span></div>
-                    {selectedMember.phone && <div className="flex items-center gap-2.5 text-sm text-dark-400"><Phone className="w-4 h-4 text-gold-600" /><span>{selectedMember.phone}</span></div>}
+                    <div className="flex items-center gap-2.5 text-sm text-dark-400"><Phone className="w-4 h-4 text-gold-600" /><span>{selectedMember.phone || '—'}</span></div>
                     <div className="flex items-center gap-2.5 text-sm text-dark-400"><Calendar className="w-4 h-4 text-gold-600" /><span>Desde {fmtDate(selectedMember.created_at)}</span></div>
                   </div>
 

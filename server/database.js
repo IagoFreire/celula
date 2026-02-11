@@ -37,7 +37,7 @@ export const db = {
     const { rows } = await pool.query(
       `INSERT INTO users (name, email, password, phone, role) 
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [name, email, password, phone || null, role || 'member']
+      [name, email || null, password || null, phone || null, role || 'member']
     );
     return rows[0];
   },
@@ -46,7 +46,7 @@ export const db = {
     const { rows } = await pool.query(
       `UPDATE users SET name = $1, email = $2, phone = $3, role = $4 
        WHERE id = $5 RETURNING *`,
-      [name, email, phone || null, role, id]
+      [name, email || null, phone || null, role, id]
     );
     if (rows.length === 0) return null;
     return rows[0];
@@ -173,7 +173,7 @@ export const db = {
 
     // Buscar participantes
     const { rows: attendees } = await pool.query(`
-      SELECT u.id, u.name, u.email, a.confirmed_at
+      SELECT u.id, u.name, u.phone, a.confirmed_at
       FROM attendance a
       JOIN users u ON u.id = a.user_id
       WHERE a.schedule_id = $1

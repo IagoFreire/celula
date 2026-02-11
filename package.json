@@ -10,7 +10,8 @@
     "start": "NODE_ENV=production node server/index.js",
     "db:migrate": "node server/db/migrate.js",
     "db:seed": "node server/db/seed.js",
-    "db:setup": "node server/db/migrate.js && node server/db/seed.js"
+    "db:setup": "node server/db/migrate.js && node server/db/seed.js",
+    "db:reset": "node server/db/reset.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

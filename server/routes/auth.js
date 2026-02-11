@@ -80,14 +80,14 @@ router.post('/phone-login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, name: user.name, email: user.email, role: user.role },
+      { id: user.id, name: user.name, phone: user.phone, role: user.role },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
+      user: { id: user.id, name: user.name, phone: user.phone, role: user.role },
     });
   } catch (err) {
     console.error(err);
@@ -109,22 +109,18 @@ router.post('/phone-register', async (req, res) => {
       return res.status(409).json({ error: 'Número já cadastrado' });
     }
 
-    // Cria com email gerado a partir do telefone e senha aleatória
-    const cleanPhone = phone.replace(/\D/g, '');
-    const fakeEmail = `phone_${cleanPhone}@celula.local`;
-    const randomPass = bcrypt.hashSync(Math.random().toString(36), 10);
-
-    const user = await db.createUser({ name, email: fakeEmail, password: randomPass, phone, role: 'member' });
+    // Membros entram apenas pelo celular, sem email/senha
+    const user = await db.createUser({ name, email: null, password: null, phone, role: 'member' });
 
     const token = jwt.sign(
-      { id: user.id, name, email: fakeEmail, role: 'member' },
+      { id: user.id, name, phone, role: 'member' },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
     res.status(201).json({
       token,
-      user: { id: user.id, name, email: fakeEmail, phone, role: 'member' },
+      user: { id: user.id, name, phone, role: 'member' },
     });
   } catch (err) {
     console.error(err);

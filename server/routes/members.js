@@ -32,7 +32,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
     res.json({ message: 'Membro atualizado' });
   } catch (err) {
     if (err.code === '23505') {
-      return res.status(409).json({ error: 'Email já cadastrado' });
+      return res.status(409).json({ error: 'Email ou telefone já cadastrado' });
     }
     console.error(err);
     res.status(500).json({ error: 'Erro ao atualizar membro' });

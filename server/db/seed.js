@@ -27,27 +27,26 @@ async function seed() {
 
     // ========== USERS ==========
     const hashedPassword = bcrypt.hashSync('admin123', 10);
-    const memberPassword = bcrypt.hashSync('senha123', 10);
 
     const usersResult = await client.query(`
       INSERT INTO users (name, email, password, phone, role) VALUES
         ('Administrador', 'admin@celula.com', $1, '(11) 99999-0001', 'admin'),
-        ('Maria Silva', 'maria@email.com', $2, '(11) 98765-4321', 'member'),
-        ('João Santos', 'joao@email.com', $2, '(11) 91234-5678', 'member'),
-        ('Ana Oliveira', 'ana@email.com', $2, '(11) 97654-3210', 'member'),
-        ('Pedro Costa', 'pedro@email.com', $2, '(11) 93456-7890', 'member'),
-        ('Carla Souza', 'carla@email.com', $2, '(11) 95678-1234', 'member'),
-        ('Lucas Ferreira', 'lucas@email.com', $2, '(11) 94567-8901', 'member'),
-        ('Juliana Almeida', 'juliana@email.com', $2, '(11) 92345-6789', 'admin'),
-        ('Rafael Lima', 'rafael@email.com', $2, '(11) 96789-0123', 'member'),
-        ('Fernanda Rocha', 'fernanda@email.com', $2, '(11) 91122-3344', 'member')
+        ('Juliana Almeida', 'juliana@email.com', $1, '(11) 92345-6789', 'admin'),
+        ('Maria Silva', NULL, NULL, '(11) 98765-4321', 'member'),
+        ('João Santos', NULL, NULL, '(11) 91234-5678', 'member'),
+        ('Ana Oliveira', NULL, NULL, '(11) 97654-3210', 'member'),
+        ('Pedro Costa', NULL, NULL, '(11) 93456-7890', 'member'),
+        ('Carla Souza', NULL, NULL, '(11) 95678-1234', 'member'),
+        ('Lucas Ferreira', NULL, NULL, '(11) 94567-8901', 'member'),
+        ('Rafael Lima', NULL, NULL, '(11) 96789-0123', 'member'),
+        ('Fernanda Rocha', NULL, NULL, '(11) 91122-3344', 'member')
       RETURNING id
-    `, [hashedPassword, memberPassword]);
+    `, [hashedPassword]);
 
     const userIds = usersResult.rows.map(r => r.id);
     console.log(`✅ ${userIds.length} usuários criados`);
     console.log('   📧 Admin: admin@celula.com / admin123');
-    console.log('   📧 Membros: [nome]@email.com / senha123');
+    console.log('   📱 Membros entram pelo celular (sem senha)');
 
     // ========== CELLS ==========
     const cellsResult = await client.query(`
@@ -115,7 +114,7 @@ async function seed() {
           $2
         )
       RETURNING id
-    `, [userIds[0], userIds[7]]);
+    `, [userIds[0], userIds[1]]);
 
     const studyIds = studiesResult.rows.map(r => r.id);
     console.log(`✅ ${studyIds.length} estudos criados`);
@@ -145,7 +144,7 @@ async function seed() {
     `, [
       cellIds[0], cellIds[1], cellIds[2], cellIds[3], cellIds[4], // $1-$5 cells
       dates[0], dates[0], dates[1], dates[1], dates[2], dates[2], // $6-$11 dates
-      userIds[0], userIds[2], userIds[0], userIds[7], userIds[3], userIds[5], // $12-$17 leaders
+      userIds[0], userIds[3], userIds[0], userIds[1], userIds[4], userIds[6], // $12-$17 leaders
       studyIds[0], studyIds[2], studyIds[3], studyIds[1], studyIds[4], studyIds[5], // $18-$23 studies
     ]);
 
@@ -159,17 +158,17 @@ async function seed() {
 
     const attendanceData = [
       // Reunião 1 - vários membros
-      [scheduleIds[0], [userIds[0], userIds[1], userIds[2], userIds[3], userIds[4], userIds[6]]],
+      [scheduleIds[0], [userIds[0], userIds[2], userIds[3], userIds[4], userIds[5], userIds[7]]],
       // Reunião 2 - jovens
-      [scheduleIds[1], [userIds[2], userIds[3], userIds[6], userIds[8]]],
+      [scheduleIds[1], [userIds[3], userIds[4], userIds[7], userIds[8]]],
       // Reunião 3 - famílias
-      [scheduleIds[2], [userIds[0], userIds[1], userIds[4], userIds[5], userIds[7], userIds[9]]],
+      [scheduleIds[2], [userIds[0], userIds[2], userIds[5], userIds[6], userIds[1], userIds[9]]],
       // Reunião 4
-      [scheduleIds[3], [userIds[0], userIds[1], userIds[2], userIds[5], userIds[7]]],
+      [scheduleIds[3], [userIds[0], userIds[2], userIds[3], userIds[6], userIds[1]]],
       // Reunião 5
-      [scheduleIds[4], [userIds[2], userIds[3], userIds[6], userIds[8], userIds[9]]],
+      [scheduleIds[4], [userIds[3], userIds[4], userIds[7], userIds[8], userIds[9]]],
       // Reunião 6 - mulheres
-      [scheduleIds[5], [userIds[1], userIds[3], userIds[5], userIds[9]]],
+      [scheduleIds[5], [userIds[2], userIds[4], userIds[6], userIds[9]]],
     ];
 
     for (const [schedId, userIdList] of attendanceData) {
@@ -218,7 +217,7 @@ async function seed() {
       cellIds[0], cellIds[1], cellIds[2], cellIds[3], cellIds[4], // $1-$5 cells
       fm2, fm1, thisMonth, // $6-$8 dates
       dates[dates.length - 1], // $9 future date
-      userIds[0], userIds[7], // $10-$11 created_by
+      userIds[0], userIds[1], // $10-$11 created_by
     ]);
 
     console.log('✅ 15 transações financeiras criadas');

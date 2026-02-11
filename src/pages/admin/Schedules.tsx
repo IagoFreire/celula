@@ -137,7 +137,7 @@ export default function AdminSchedules() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-dark-50">{a.name}</p>
-                        <p className="text-xs text-dark-500">{a.email}</p>
+                        <p className="text-xs text-dark-500">{a.phone || '—'}</p>
                       </div>
                     </div>
                   ))}

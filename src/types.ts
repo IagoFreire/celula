@@ -1,7 +1,7 @@
 export interface User {
   id: number;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   role: 'admin' | 'member';
   created_at?: string;
@@ -44,7 +44,7 @@ export interface Schedule {
 export interface Attendee {
   id: number;
   name: string;
-  email: string;
+  phone?: string;
 }
 
 export interface AttendanceRecord {
@@ -143,7 +143,6 @@ export interface ScheduleForm {
 
 export interface MemberForm {
   name: string;
-  email: string;
   phone: string;
   role: string;
 }

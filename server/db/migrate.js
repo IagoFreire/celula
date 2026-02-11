@@ -7,15 +7,16 @@ const migration = `
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password VARCHAR(255) NOT NULL,
-  phone VARCHAR(50),
+  email VARCHAR(255) UNIQUE,
+  password VARCHAR(255),
+  phone VARCHAR(50) UNIQUE,
   role VARCHAR(20) NOT NULL DEFAULT 'member',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 
 -- ========================================
 -- Tabela: cells (células)
@@ -96,6 +97,18 @@ CREATE TABLE IF NOT EXISTS finances (
 CREATE INDEX IF NOT EXISTS idx_finances_type ON finances(type);
 CREATE INDEX IF NOT EXISTS idx_finances_date ON finances(date);
 CREATE INDEX IF NOT EXISTS idx_finances_cell_id ON finances(cell_id);
+
+-- Migração: membros sem email (email e password opcionais, phone único)
+ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
+ALTER TABLE users ALTER COLUMN password DROP NOT NULL;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'users_phone_key'
+  ) THEN
+    ALTER TABLE users ADD CONSTRAINT users_phone_key UNIQUE (phone);
+  END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 `;
 
 async function migrate() {
