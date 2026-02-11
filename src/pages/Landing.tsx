@@ -159,7 +159,7 @@ export default function Landing() {
               <Church className="w-5 h-5 text-gold-500" />
               <span className="font-bold text-dark-100">Células</span>
             </div>
-            <p className="text-xs text-dark-600">Sistema de Gestão de Células • Conectando vidas através da comunhão</p>
+            <p className="text-xs text-dark-600">Sistema de Gestão de Células • Conectando vidas através da comunhão.</p>
           </div>
           <button onClick={toggleTheme} className="theme-toggle flex-shrink-0" aria-label="Alternar tema">
             <Sun className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 transition-all duration-300 ${isDark ? 'opacity-30 text-dark-600' : 'opacity-100 text-amber-500'}`} />
