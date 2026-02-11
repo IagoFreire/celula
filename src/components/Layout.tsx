@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import {
-  Calendar, BookOpen, LayoutDashboard, DollarSign, Users, Library,
+  Calendar, BookOpen, LayoutDashboard, DollarSign, Library, Home,
   LogOut, Menu, X, Church, CalendarDays, Sparkles, Sun, Moon,
   type LucideIcon,
 } from 'lucide-react';
@@ -32,7 +32,7 @@ export default function Layout() {
     { to: '/admin/cronogramas', icon: CalendarDays, label: 'Cronogramas' },
     { to: '/admin/financas', icon: DollarSign, label: 'Finanças' },
     { to: '/admin/estudos', icon: Library, label: 'Estudos' },
-    { to: '/admin/membros', icon: Users, label: 'Membros' },
+    { to: '/admin/celulas', icon: Home, label: 'Células' },
   ];
 
   const NavItem = ({ to, icon: Icon, label }: NavItemProps) => (

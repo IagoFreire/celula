@@ -57,6 +57,14 @@ export interface AttendanceRecord {
 export interface Cell {
   id: number;
   name: string;
+  description?: string;
+  address?: string;
+  day_of_week?: number | null;
+  meeting_time?: string;
+  frequency?: 'weekly' | 'biweekly' | 'monthly';
+  next_date?: string | null;
+  member_count?: number;
+  created_at?: string;
 }
 
 export interface Study {

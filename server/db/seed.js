@@ -28,6 +28,7 @@ async function seed() {
     // ========== USERS ==========
     const hashedPassword = bcrypt.hashSync('admin123', 10);
 
+    // Users criados sem cell_id (será atualizado após criação das cells)
     const usersResult = await client.query(`
       INSERT INTO users (name, email, password, phone, role) VALUES
         ('Administrador', 'admin@celula.com', $1, '(11) 99999-0001', 'admin'),
@@ -50,17 +51,26 @@ async function seed() {
 
     // ========== CELLS ==========
     const cellsResult = await client.query(`
-      INSERT INTO cells (name, description) VALUES
-        ('Célula Central', 'Célula principal da igreja, reuniões às quartas-feiras'),
-        ('Célula Jovens', 'Célula para jovens de 18 a 30 anos'),
-        ('Célula Famílias', 'Célula voltada para casais e famílias'),
-        ('Célula Mulheres', 'Célula de mulheres, encontros quinzenais'),
-        ('Célula Homens', 'Célula de homens, encontros aos sábados')
+      INSERT INTO cells (name, description, address, day_of_week, meeting_time, frequency) VALUES
+        ('Célula Central', 'Célula principal da igreja', 'Rua da Igreja, 100 - Centro', 3, '19:30', 'weekly'),
+        ('Célula Jovens', 'Célula para jovens de 18 a 30 anos', 'Av. Jovem, 500 - Bairro Novo', 5, '20:00', 'weekly'),
+        ('Célula Famílias', 'Célula voltada para casais e famílias', 'Rua da Família, 20 - Jardim Feliz', 6, '18:00', 'biweekly'),
+        ('Célula Mulheres', 'Célula de mulheres, encontros quinzenais', 'Rua das Rosas, 30 - Vila Bela', 4, '15:00', 'biweekly'),
+        ('Célula Homens', 'Célula de homens, encontros aos sábados', 'Av. dos Homens, 10 - Indústria', 6, '08:00', 'monthly')
       RETURNING id
     `);
 
     const cellIds = cellsResult.rows.map(r => r.id);
     console.log(`✅ ${cellIds.length} células criadas`);
+
+    // Associar membros às células
+    // Maria(2), João(3), Pedro(5) -> Célula Central
+    await client.query('UPDATE users SET cell_id = $1 WHERE id IN ($2, $3, $4)', [cellIds[0], userIds[2], userIds[3], userIds[5]]);
+    // Ana(4), Lucas(7), Rafael(8) -> Célula Jovens
+    await client.query('UPDATE users SET cell_id = $1 WHERE id IN ($2, $3, $4)', [cellIds[1], userIds[4], userIds[7], userIds[8]]);
+    // Carla(6), Fernanda(9) -> Célula Famílias
+    await client.query('UPDATE users SET cell_id = $1 WHERE id IN ($2, $3)', [cellIds[2], userIds[6], userIds[9]]);
+    console.log('✅ Membros associados às células');
 
     // ========== STUDIES ==========
     const studiesResult = await client.query(`

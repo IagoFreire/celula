@@ -94,28 +94,205 @@ export const db = {
 
   // --- Cells ---
   async getAllCells() {
-    const { rows } = await pool.query('SELECT * FROM cells ORDER BY name');
+    const { rows } = await pool.query(`
+      SELECT c.*, COUNT(u.id)::int AS member_count
+      FROM cells c
+      LEFT JOIN users u ON u.cell_id = c.id AND u.role = 'member'
+      GROUP BY c.id
+      ORDER BY c.name
+    `);
     return rows;
   },
 
-  async createCell({ name, description }) {
+  async getCellMembers(cellId) {
+    const { rows } = await pool.query(`
+      SELECT u.id, u.name, u.phone, u.role, u.created_at,
+             COUNT(a.id)::int AS total_attendance
+      FROM users u
+      LEFT JOIN attendance a ON a.user_id = u.id
+      WHERE u.cell_id = $1
+      GROUP BY u.id
+      ORDER BY u.name
+    `, [cellId]);
+    return rows;
+  },
+
+  async createCell({ name, description, address, day_of_week, meeting_time, frequency, next_date }) {
     const { rows } = await pool.query(
-      'INSERT INTO cells (name, description) VALUES ($1, $2) RETURNING *',
-      [name, description || null]
+      `INSERT INTO cells (name, description, address, day_of_week, meeting_time, frequency, next_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [name, description || null, address || null, day_of_week ?? null, meeting_time || null, frequency || 'weekly', next_date || null]
     );
     return rows[0];
   },
 
-  async updateCell(id, { name, description }) {
+  async updateCell(id, { name, description, address, day_of_week, meeting_time, frequency, next_date }) {
     const { rows } = await pool.query(
-      'UPDATE cells SET name = $1, description = $2 WHERE id = $3 RETURNING *',
-      [name, description || null, id]
+      `UPDATE cells SET name = $1, description = $2, address = $3, day_of_week = $4, meeting_time = $5, frequency = $6, next_date = $7
+       WHERE id = $8 RETURNING *`,
+      [name, description || null, address || null, day_of_week ?? null, meeting_time || null, frequency || 'weekly', next_date || null, id]
     );
     return rows[0] || null;
   },
 
   async deleteCell(id) {
+    // Desassocia membros antes de excluir
+    await pool.query('UPDATE users SET cell_id = NULL WHERE cell_id = $1', [id]);
     await pool.query('DELETE FROM cells WHERE id = $1', [id]);
+  },
+
+  async addMemberToCell(cellId, { name, phone }) {
+    // Verifica se o telefone já está cadastrado
+    const existing = await this.findUserByPhone(phone);
+    if (existing) {
+      // Apenas associa à célula
+      const { rows } = await pool.query(
+        'UPDATE users SET cell_id = $1 WHERE id = $2 RETURNING *',
+        [cellId, existing.id]
+      );
+      return rows[0];
+    }
+    // Cria novo membro
+    const { rows } = await pool.query(
+      `INSERT INTO users (name, phone, role, cell_id) VALUES ($1, $2, 'member', $3) RETURNING *`,
+      [name, phone, cellId]
+    );
+    return rows[0];
+  },
+
+  async removeMemberFromCell(userId) {
+    const { rows } = await pool.query(
+      'UPDATE users SET cell_id = NULL WHERE id = $1 RETURNING *',
+      [userId]
+    );
+    return rows[0] || null;
+  },
+
+  // --- Schedule Cancellations ---
+  async cancelSchedule(cellId, date, reason, cancelledBy) {
+    const { rows } = await pool.query(
+      `INSERT INTO schedule_cancellations (cell_id, date, reason, cancelled_by)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (cell_id, date) DO UPDATE SET reason = $3, cancelled_by = $4
+       RETURNING *`,
+      [cellId, date, reason || null, cancelledBy || null]
+    );
+    return rows[0];
+  },
+
+  async reactivateSchedule(cellId, date) {
+    await pool.query(
+      'DELETE FROM schedule_cancellations WHERE cell_id = $1 AND date = $2',
+      [cellId, date]
+    );
+  },
+
+  async getCancellations() {
+    const { rows } = await pool.query(`
+      SELECT sc.*, u.name AS cancelled_by_name
+      FROM schedule_cancellations sc
+      LEFT JOIN users u ON u.id = sc.cancelled_by
+      ORDER BY sc.date
+    `);
+    return rows;
+  },
+
+  // --- Schedule Generation (from cells) ---
+  async generateCellSchedule() {
+    // Busca todas as células com dia da semana configurado
+    const { rows: cells } = await pool.query(`
+      SELECT c.*, COUNT(u.id)::int AS member_count
+      FROM cells c
+      LEFT JOIN users u ON u.cell_id = c.id AND u.role = 'member'
+      WHERE c.day_of_week IS NOT NULL
+      GROUP BY c.id
+      ORDER BY c.name
+    `);
+
+    // Busca cancelamentos
+    const { rows: cancellations } = await pool.query(
+      'SELECT cell_id, date, reason FROM schedule_cancellations'
+    );
+    const cancelMap = new Map();
+    for (const c of cancellations) {
+      const key = `${c.cell_id}_${c.date instanceof Date ? c.date.toISOString().split('T')[0] : String(c.date).split('T')[0]}`;
+      cancelMap.set(key, c.reason);
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const limit = new Date(today);
+    limit.setMonth(limit.getMonth() + 3);
+
+    const meetings = [];
+
+    for (const cell of cells) {
+      const targetDay = cell.day_of_week; // 0=Dom, 1=Seg, ...
+
+      // Se next_date definido e >= hoje, usar como ponto de partida
+      let current;
+      if (cell.next_date) {
+        const nd = cell.next_date instanceof Date
+          ? cell.next_date
+          : new Date(String(cell.next_date).split('T')[0] + 'T00:00:00');
+        if (nd >= today) {
+          current = new Date(nd);
+        } else {
+          // next_date já passou, calcular normalmente a partir de hoje
+          current = new Date(today);
+          const diff = (targetDay - current.getDay() + 7) % 7;
+          current.setDate(current.getDate() + (diff === 0 ? 0 : diff));
+        }
+      } else {
+        // Encontrar a próxima ocorrência desse dia a partir de hoje
+        current = new Date(today);
+        const diff = (targetDay - current.getDay() + 7) % 7;
+        current.setDate(current.getDate() + (diff === 0 ? 0 : diff));
+      }
+
+      // Gerar datas até 3 meses
+      while (current <= limit) {
+        const dateStr = current.toISOString().split('T')[0];
+        const cancelKey = `${cell.id}_${dateStr}`;
+        const isCancelled = cancelMap.has(cancelKey);
+
+        meetings.push({
+          cell_id: cell.id,
+          title: cell.name,
+          date: dateStr,
+          time: cell.meeting_time || '19:00',
+          location: cell.address || 'A definir',
+          cell_name: cell.name,
+          description: cell.description,
+          frequency: cell.frequency,
+          member_count: cell.member_count,
+          cancelled: isCancelled,
+          cancel_reason: isCancelled ? cancelMap.get(cancelKey) : null,
+        });
+
+        // Avançar pela frequência
+        if (cell.frequency === 'biweekly') {
+          current.setDate(current.getDate() + 14);
+        } else if (cell.frequency === 'monthly') {
+          current.setMonth(current.getMonth() + 1);
+          // Ajustar para o dia da semana correto no próximo mês
+          const newDiff = (targetDay - current.getDay() + 7) % 7;
+          current.setDate(current.getDate() + newDiff);
+        } else {
+          // weekly (default)
+          current.setDate(current.getDate() + 7);
+        }
+      }
+    }
+
+    // Ordenar por data e horário
+    meetings.sort((a, b) => {
+      const cmp = a.date.localeCompare(b.date);
+      if (cmp !== 0) return cmp;
+      return (a.time || '').localeCompare(b.time || '');
+    });
+
+    return meetings;
   },
 
   // --- Schedules ---

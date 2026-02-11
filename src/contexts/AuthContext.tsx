@@ -6,8 +6,9 @@ interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<{ token: string; user: User }>;
   register: (name: string, email: string, password: string, phone?: string) => Promise<{ token: string; user: User }>;
-  phoneLogin: (phone: string) => Promise<{ token: string; user: User }>;
-  phoneRegister: (name: string, phone: string) => Promise<{ token: string; user: User }>;
+  phoneLogin: (phone: string) => Promise<{ token: string; user: User; needs_cell?: boolean }>;
+  phoneRegister: (name: string, phone: string, cell_id?: number) => Promise<{ token: string; user: User }>;
+  selectCell: (cell_id: number) => Promise<void>;
   logout: () => void;
   loading: boolean;
   isAdmin: boolean;
@@ -54,16 +55,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await api.phoneLogin(phone);
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
-    setUser(data.user);
+    // Só seta o user se não precisar escolher célula (senão a tela de login redireciona)
+    if (!data.needs_cell) {
+      setUser(data.user);
+    }
     return data;
   };
 
-  const phoneRegister = async (name: string, phone: string) => {
-    const data = await api.phoneRegister(name, phone);
+  const phoneRegister = async (name: string, phone: string, cell_id?: number) => {
+    const data = await api.phoneRegister(name, phone, cell_id);
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
     setUser(data.user);
     return data;
+  };
+
+  const selectCell = async (cell_id: number) => {
+    const data = await api.selectCell(cell_id);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user);
   };
 
   const logout = () => {
@@ -75,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = user?.role === 'admin';
 
   return (
-    <AuthContext.Provider value={{ user, login, register, phoneLogin, phoneRegister, logout, loading, isAdmin }}>
+    <AuthContext.Provider value={{ user, login, register, phoneLogin, phoneRegister, selectCell, logout, loading, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

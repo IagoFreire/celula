@@ -12,7 +12,7 @@ import AdminDashboard from './pages/admin/Dashboard';
 import AdminSchedules from './pages/admin/Schedules';
 import AdminFinances from './pages/admin/Finances';
 import AdminStudyLibrary from './pages/admin/StudyLibrary';
-import AdminMembers from './pages/admin/Members';
+import AdminCells from './pages/admin/Cells';
 
 export default function App() {
   const { loading } = useAuth();
@@ -53,7 +53,7 @@ export default function App() {
         <Route path="/admin/cronogramas" element={<ProtectedRoute requireAdmin><AdminSchedules /></ProtectedRoute>} />
         <Route path="/admin/financas" element={<ProtectedRoute requireAdmin><AdminFinances /></ProtectedRoute>} />
         <Route path="/admin/estudos" element={<ProtectedRoute requireAdmin><AdminStudyLibrary /></ProtectedRoute>} />
-        <Route path="/admin/membros" element={<ProtectedRoute requireAdmin><AdminMembers /></ProtectedRoute>} />
+        <Route path="/admin/celulas" element={<ProtectedRoute requireAdmin><AdminCells /></ProtectedRoute>} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -3,8 +3,6 @@ import type {
   LoginData,
   RegisterData,
   User,
-  Schedule,
-  AttendanceRecord,
   Cell,
   Study,
   Finance,
@@ -59,23 +57,19 @@ export const api = {
   // Auth
   login: (data: LoginData) => request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   register: (data: RegisterData) => request<AuthResponse>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
-  phoneLogin: (phone: string) => request<AuthResponse>('/auth/phone-login', { method: 'POST', body: JSON.stringify({ phone }) }),
-  phoneRegister: (name: string, phone: string) => request<AuthResponse>('/auth/phone-register', { method: 'POST', body: JSON.stringify({ name, phone }) }),
+  phoneLogin: (phone: string) => request<{ token: string; user: User; needs_cell?: boolean }>('/auth/phone-login', { method: 'POST', body: JSON.stringify({ phone }) }),
+  phoneRegister: (name: string, phone: string, cell_id?: number) => request<AuthResponse>('/auth/phone-register', { method: 'POST', body: JSON.stringify({ name, phone, cell_id }) }),
+  selectCell: (cell_id: number) => request<{ user: User }>('/auth/select-cell', { method: 'POST', body: JSON.stringify({ cell_id }) }),
   getMe: () => request<User>('/auth/me'),
+  getPublicCells: () => request<{ id: number; name: string; description?: string; address?: string }[]>('/cells/public'),
 
-  // Schedules
-  getSchedules: () => request<Schedule[]>('/schedules'),
-  getUpcomingSchedules: () => request<Schedule[]>('/schedules/upcoming'),
-  getSchedule: (id: number) => request<Schedule>(`/schedules/${id}`),
-  createSchedule: (data: Record<string, unknown>) => request<Schedule>('/schedules', { method: 'POST', body: JSON.stringify(data) }),
-  updateSchedule: (id: number, data: Record<string, unknown>) => request<Schedule>(`/schedules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteSchedule: (id: number) => request<void>(`/schedules/${id}`, { method: 'DELETE' }),
-
-  // Attendance
-  confirmAttendance: (scheduleId: number) => request<void>(`/attendance/${scheduleId}`, { method: 'POST' }),
-  cancelAttendance: (scheduleId: number) => request<void>(`/attendance/${scheduleId}`, { method: 'DELETE' }),
-  checkAttendance: (scheduleId: number) => request<{ confirmed: boolean }>(`/attendance/check/${scheduleId}`),
-  getMyAttendance: () => request<AttendanceRecord[]>('/attendance/my'),
+  // Schedules (gerados automaticamente das células)
+  getSchedules: () => request<Record<string, unknown>[]>('/schedules'),
+  getUpcomingSchedules: () => request<Record<string, unknown>[]>('/schedules/upcoming'),
+  cancelSchedule: (cell_id: number, date: string, reason: string) =>
+    request<Record<string, unknown>>('/schedules/cancel', { method: 'POST', body: JSON.stringify({ cell_id, date, reason }) }),
+  reactivateSchedule: (cell_id: number, date: string) =>
+    request<Record<string, unknown>>('/schedules/reactivate', { method: 'POST', body: JSON.stringify({ cell_id, date }) }),
 
   // Finances
   getFinances: (params: Record<string, string>) => {
@@ -102,14 +96,14 @@ export const api = {
   deleteStudy: (id: number) => request<void>(`/studies/${id}`, { method: 'DELETE' }),
 
   // Members
-  getMembers: () => request<Member[]>('/members'),
   getMember: (id: number) => request<Member>(`/members/${id}`),
-  updateMember: (id: number, data: Record<string, unknown>) => request<Member>(`/members/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteMember: (id: number) => request<void>(`/members/${id}`, { method: 'DELETE' }),
 
   // Cells
   getCells: () => request<Cell[]>('/cells'),
   createCell: (data: Record<string, unknown>) => request<Cell>('/cells', { method: 'POST', body: JSON.stringify(data) }),
   updateCell: (id: number, data: Record<string, unknown>) => request<Cell>(`/cells/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteCell: (id: number) => request<void>(`/cells/${id}`, { method: 'DELETE' }),
+  getCellMembers: (cellId: number) => request<Member[]>(`/cells/${cellId}/members`),
+  addCellMember: (cellId: number, data: { name: string; phone: string }) => request<Member>(`/cells/${cellId}/members`, { method: 'POST', body: JSON.stringify(data) }),
+  removeCellMember: (cellId: number, userId: number) => request<void>(`/cells/${cellId}/members/${userId}`, { method: 'DELETE' }),
 };

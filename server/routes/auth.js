@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { db } from '../database.js';
+import pool from '../db/pool.js';
 import { JWT_SECRET, authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
@@ -87,7 +88,8 @@ router.post('/phone-login', async (req, res) => {
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, phone: user.phone, role: user.role },
+      user: { id: user.id, name: user.name, phone: user.phone, role: user.role, cell_id: user.cell_id || null },
+      needs_cell: !user.cell_id,
     });
   } catch (err) {
     console.error(err);
@@ -98,7 +100,7 @@ router.post('/phone-login', async (req, res) => {
 // Registro por celular (sem senha)
 router.post('/phone-register', async (req, res) => {
   try {
-    const { name, phone } = req.body;
+    const { name, phone, cell_id } = req.body;
     if (!name || !phone) {
       return res.status(400).json({ error: 'Nome e celular são obrigatórios' });
     }
@@ -112,6 +114,12 @@ router.post('/phone-register', async (req, res) => {
     // Membros entram apenas pelo celular, sem email/senha
     const user = await db.createUser({ name, email: null, password: null, phone, role: 'member' });
 
+    // Se cell_id foi informado, associar à célula
+    if (cell_id) {
+      await pool.query('UPDATE users SET cell_id = $1 WHERE id = $2', [cell_id, user.id]);
+      user.cell_id = cell_id;
+    }
+
     const token = jwt.sign(
       { id: user.id, name, phone, role: 'member' },
       JWT_SECRET,
@@ -120,11 +128,31 @@ router.post('/phone-register', async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id: user.id, name, phone, role: 'member' },
+      user: { id: user.id, name, phone, role: 'member', cell_id: user.cell_id || null },
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Selecionar célula (para membros que ainda não têm célula)
+router.post('/select-cell', authenticateToken, async (req, res) => {
+  try {
+    const { cell_id } = req.body;
+    if (!cell_id) {
+      return res.status(400).json({ error: 'Célula é obrigatória' });
+    }
+
+    await pool.query('UPDATE users SET cell_id = $1 WHERE id = $2', [cell_id, req.user.id]);
+
+    const user = await db.findUserById(req.user.id);
+    const { password, ...safeUser } = user;
+
+    res.json({ user: safeUser });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao selecionar célula' });
   }
 });
 

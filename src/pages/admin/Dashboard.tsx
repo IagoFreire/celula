@@ -42,13 +42,13 @@ export default function Dashboard() {
 
   const loadStats = async () => {
     try {
-      const [members, schedules, finances, studies] = await Promise.all([
-        api.getMembers(), api.getSchedules(), api.getFinanceSummary(), api.getStudies(),
+      const [cells, schedules, finances, studies] = await Promise.all([
+        api.getCells(), api.getSchedules(), api.getFinanceSummary(), api.getStudies(),
       ]);
-      const today = new Date().toISOString().split('T')[0];
+      const totalMembers = cells.reduce((sum, c) => sum + (c.member_count || 0), 0);
       setStats({
-        totalMembers: members.length,
-        upcomingSchedules: schedules.filter((s) => s.date >= today).length,
+        totalMembers,
+        upcomingSchedules: schedules.length,
         totalStudies: studies.length,
         income: finances.income,
         expense: finances.expense,
@@ -65,7 +65,7 @@ export default function Dashboard() {
   }
 
   const cards: DashboardCard[] = [
-    { title: 'Membros', value: stats?.totalMembers || 0, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10', shadow: 'shadow-[0_2px_10px_rgba(59,130,246,0.12)]', link: '/admin/membros', gradient: 'stat-gradient-blue', borderColor: 'rgba(59,130,246,0.15)' },
+    { title: 'Membros', value: stats?.totalMembers || 0, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10', shadow: 'shadow-[0_2px_10px_rgba(59,130,246,0.12)]', link: '/admin/celulas', gradient: 'stat-gradient-blue', borderColor: 'rgba(59,130,246,0.15)' },
     { title: 'Próximas Reuniões', value: stats?.upcomingSchedules || 0, icon: Calendar, color: 'text-gold-400', bg: 'bg-gold-500/10', shadow: 'shadow-[0_2px_10px_rgba(217,115,26,0.12)]', link: '/admin/cronogramas', gradient: 'stat-gradient-gold', borderColor: 'rgba(217,115,26,0.15)' },
     { title: 'Estudos', value: stats?.totalStudies || 0, icon: BookOpen, color: 'text-accent-400', bg: 'bg-accent-500/10', shadow: 'shadow-[0_2px_10px_rgba(191,36,122,0.12)]', link: '/admin/estudos', gradient: 'stat-gradient-accent', borderColor: 'rgba(191,36,122,0.15)' },
     { title: 'Saldo', value: formatCurrency(stats?.balance ?? 0), icon: Wallet, color: (stats?.balance ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400', bg: (stats?.balance ?? 0) >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10', shadow: (stats?.balance ?? 0) >= 0 ? 'shadow-[0_2px_10px_rgba(16,185,129,0.12)]' : 'shadow-[0_2px_10px_rgba(239,68,68,0.12)]', link: '/admin/financas', gradient: (stats?.balance ?? 0) >= 0 ? 'stat-gradient-green' : 'stat-gradient-red', borderColor: (stats?.balance ?? 0) >= 0 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)' },

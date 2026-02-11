@@ -1,54 +1,47 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import type { Schedule as ScheduleType } from '../types';
 import {
   Calendar,
   MapPin,
   Clock,
-  User,
-  CheckCircle2,
-  Circle,
-  BookOpen,
   Users,
+  XCircle,
+  AlertTriangle,
 } from 'lucide-react';
 
+interface GeneratedMeeting {
+  cell_id: number;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  cell_name: string;
+  description?: string;
+  frequency?: string;
+  member_count?: number;
+  cancelled?: boolean;
+  cancel_reason?: string | null;
+}
+
+const FREQ_LABELS: Record<string, string> = {
+  weekly: 'Semanal',
+  biweekly: 'Quinzenal',
+  monthly: 'Mensal',
+};
+
 export default function Schedule() {
-  const [schedules, setSchedules] = useState<ScheduleType[]>([]);
+  const [meetings, setMeetings] = useState<GeneratedMeeting[]>([]);
   const [loading, setLoading] = useState(true);
-  const [confirmingId, setConfirmingId] = useState<number | null>(null);
-  const [attendanceMap, setAttendanceMap] = useState<Record<number, boolean>>({});
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [schedulesData, myAttendance] = await Promise.all([
-        api.getUpcomingSchedules(),
-        api.getMyAttendance(),
-      ]);
-      setSchedules(schedulesData);
-      const map: Record<number, boolean> = {};
-      myAttendance.forEach((a) => { map[a.schedule_id] = true; });
-      setAttendanceMap(map);
+      const data = await api.getUpcomingSchedules();
+      setMeetings(data as unknown as GeneratedMeeting[]);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
-  };
-
-  const toggleAttendance = async (scheduleId: number) => {
-    setConfirmingId(scheduleId);
-    try {
-      if (attendanceMap[scheduleId]) {
-        await api.cancelAttendance(scheduleId);
-        setAttendanceMap((prev) => { const next = { ...prev }; delete next[scheduleId]; return next; });
-        setSchedules((prev) => prev.map((s) => s.id === scheduleId ? { ...s, confirmed_count: s.confirmed_count - 1 } : s));
-      } else {
-        await api.confirmAttendance(scheduleId);
-        setAttendanceMap((prev) => ({ ...prev, [scheduleId]: true }));
-        setSchedules((prev) => prev.map((s) => s.id === scheduleId ? { ...s, confirmed_count: s.confirmed_count + 1 } : s));
-      }
-    } catch (err) { console.error(err); }
-    finally { setConfirmingId(null); }
   };
 
   const formatDate = (dateStr: string) => {
@@ -77,7 +70,7 @@ export default function Schedule() {
         <p className="page-subtitle">Próximas reuniões de célula</p>
       </div>
 
-      {schedules.length === 0 ? (
+      {meetings.length === 0 ? (
         <div className="card text-center py-16 animate-fade-in">
           <Calendar className="w-14 h-14 text-dark-700 mx-auto mb-4" />
           <p className="text-dark-500 text-lg">Nenhuma reunião agendada</p>
@@ -85,89 +78,77 @@ export default function Schedule() {
         </div>
       ) : (
         <div className="space-y-4">
-          {schedules.map((schedule) => {
-            const date = formatDate(schedule.date);
-            const isConfirmed = attendanceMap[schedule.id];
-            const isConfirming = confirmingId === schedule.id;
+          {meetings.map((meeting, i) => {
+            const date = formatDate(meeting.date);
 
             return (
               <div
-                key={schedule.id}
-                className="card-hover stagger-item"
+                key={`${meeting.cell_id}-${meeting.date}-${i}`}
+                className={`card-hover stagger-item ${meeting.cancelled ? 'opacity-60' : ''}`}
                 style={{ animationFillMode: 'both' }}
               >
                 <div className="flex gap-4">
                   {/* Date Badge */}
-                  <div className="flex-shrink-0 w-16 h-16 rounded-xl flex flex-col items-center justify-center shadow-[0_2px_14px_rgba(191,36,122,0.15)]"
-                    style={{ background: 'linear-gradient(135deg, rgba(191,36,122,0.15), rgba(217,115,26,0.12))' }}>
-                    <span className="text-[10px] font-bold text-gold-600 uppercase tracking-wider">{date.month}</span>
-                    <span className="text-2xl font-extrabold text-gold-400 leading-none">{date.day}</span>
+                  <div className={`flex-shrink-0 w-16 h-16 rounded-xl flex flex-col items-center justify-center shadow-[0_2px_14px_rgba(191,36,122,0.15)]`}
+                    style={{ background: meeting.cancelled
+                      ? 'linear-gradient(135deg, rgba(127,127,127,0.15), rgba(127,127,127,0.12))'
+                      : 'linear-gradient(135deg, rgba(191,36,122,0.15), rgba(217,115,26,0.12))'
+                    }}>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${meeting.cancelled ? 'text-dark-600' : 'text-gold-600'}`}>{date.month}</span>
+                    <span className={`text-2xl font-extrabold leading-none ${meeting.cancelled ? 'text-dark-500' : 'text-gold-400'}`}>{date.day}</span>
                     <span className="text-[10px] text-dark-500">{date.dayName}</span>
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-dark-50 text-[15px]">{schedule.title}</h3>
-
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-dark-400">
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-gold-600" />
-                        {schedule.time}
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-gold-600" />
-                        {schedule.location}
-                      </span>
-                      {schedule.leader_name && (
-                        <span className="flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-gold-600" />
-                          {schedule.leader_name}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className={`font-bold text-[15px] ${meeting.cancelled ? 'text-dark-500 line-through' : 'text-dark-50'}`}>{meeting.title}</h3>
+                      {meeting.frequency && (
+                        <span className="text-[10px] text-dark-600 bg-dark-850 px-2 py-0.5 rounded-full">{FREQ_LABELS[meeting.frequency] || meeting.frequency}</span>
+                      )}
+                      {meeting.cancelled && (
+                        <span className="flex items-center gap-1 bg-red-500/10 text-red-400 px-2 py-0.5 rounded-lg text-[10px] font-semibold">
+                          <XCircle className="w-3 h-3" />Cancelada
                         </span>
                       )}
                     </div>
 
-                    {schedule.cell_name && (
-                      <span className="badge-gold mt-2 text-[11px]">{schedule.cell_name}</span>
-                    )}
-
-                    {schedule.study_title && (
-                      <div className="mt-2 flex items-center gap-1.5 text-sm text-gold-500/70">
-                        <BookOpen className="w-3.5 h-3.5" />
-                        <span className="truncate">{schedule.study_title}</span>
+                    {meeting.cancelled && meeting.cancel_reason && (
+                      <div className="mt-2 flex items-start gap-1.5 text-sm text-red-400/80 bg-red-500/5 px-3 py-2 rounded-lg">
+                        <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                        <span>{meeting.cancel_reason}</span>
                       </div>
                     )}
 
-                    {schedule.notes && (
-                      <p className="mt-2 text-sm text-dark-600 line-clamp-2">{schedule.notes}</p>
+                    {!meeting.cancelled && (
+                      <>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-dark-400">
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-gold-600" />
+                            {meeting.time}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-gold-600" />
+                            {meeting.location}
+                          </span>
+                          {meeting.member_count != null && (
+                            <span className="flex items-center gap-1.5">
+                              <Users className="w-3.5 h-3.5 text-gold-600" />
+                              {meeting.member_count} membro{meeting.member_count !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+
+                        {meeting.cell_name && (
+                          <span className="badge-gold mt-2 text-[11px]">{meeting.cell_name}</span>
+                        )}
+
+                        {meeting.description && (
+                          <p className="mt-2 text-sm text-dark-600 line-clamp-2">{meeting.description}</p>
+                        )}
+                      </>
                     )}
                   </div>
-                </div>
-
-                {/* Actions */}
-                <div className="mt-4 pt-3 flex items-center justify-between" style={{ paddingTop: '0.85rem', marginTop: '0.85rem' }}>
-                  <span className="flex items-center gap-1.5 text-sm text-dark-500">
-                    <Users className="w-4 h-4" />
-                    {schedule.confirmed_count} confirmado{schedule.confirmed_count !== 1 ? 's' : ''}
-                  </span>
-
-                  <button
-                    onClick={() => toggleAttendance(schedule.id)}
-                    disabled={isConfirming}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 active:scale-95 ${
-                      isConfirmed
-                        ? 'bg-emerald-500/10 text-emerald-400 shadow-[0_2px_10px_rgba(16,185,129,0.15)]'
-                        : 'bg-gold-500/10 text-gold-400 shadow-[0_2px_10px_rgba(217,115,26,0.12)] hover:shadow-[0_4px_18px_rgba(217,115,26,0.2)]'
-                    }`}
-                  >
-                    {isConfirming ? (
-                      <div className="spinner w-4 h-4" />
-                    ) : isConfirmed ? (
-                      <CheckCircle2 className="w-4 h-4" />
-                    ) : (
-                      <Circle className="w-4 h-4" />
-                    )}
-                    {isConfirmed ? 'Confirmado' : 'Confirmar'}
-                  </button>
                 </div>
               </div>
             );

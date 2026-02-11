@@ -25,6 +25,11 @@ CREATE TABLE IF NOT EXISTS cells (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   description TEXT,
+  address VARCHAR(500),
+  day_of_week SMALLINT,
+  meeting_time VARCHAR(10),
+  frequency VARCHAR(20) DEFAULT 'weekly',
+  next_date DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -109,6 +114,60 @@ DO $$ BEGIN
   END IF;
 END $$;
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+
+-- Migração: associar membros a células
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'cell_id'
+  ) THEN
+    ALTER TABLE users ADD COLUMN cell_id INTEGER REFERENCES cells(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_users_cell_id ON users(cell_id);
+
+-- Migração: endereço da célula
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name = 'cells' AND column_name = 'address'
+  ) THEN
+    ALTER TABLE cells ADD COLUMN address VARCHAR(500);
+  END IF;
+END $$;
+
+-- Migração: dia, horário e frequência da célula
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name = 'cells' AND column_name = 'day_of_week'
+  ) THEN
+    ALTER TABLE cells ADD COLUMN day_of_week SMALLINT;
+    ALTER TABLE cells ADD COLUMN meeting_time VARCHAR(10);
+    ALTER TABLE cells ADD COLUMN frequency VARCHAR(20) DEFAULT 'weekly';
+  END IF;
+END $$;
+
+-- Migração: data da próxima reunião (next_date)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name = 'cells' AND column_name = 'next_date'
+  ) THEN
+    ALTER TABLE cells ADD COLUMN next_date DATE;
+  END IF;
+END $$;
+
+-- ========================================
+-- Tabela: schedule_cancellations (cancelamentos de reunião)
+-- ========================================
+CREATE TABLE IF NOT EXISTS schedule_cancellations (
+  id SERIAL PRIMARY KEY,
+  cell_id INTEGER NOT NULL REFERENCES cells(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  reason TEXT,
+  cancelled_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(cell_id, date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_schedule_cancellations_cell_date ON schedule_cancellations(cell_id, date);
 `;
 
 async function migrate() {

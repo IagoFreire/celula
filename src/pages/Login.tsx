@@ -1,13 +1,21 @@
-import { useState, type FormEvent } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { useState, useEffect, type FormEvent } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { Church, Eye, EyeOff, LogIn, Sparkles, Sun, Moon, Phone, ArrowRight, User } from 'lucide-react';
+import { api } from '../api';
+import { Church, Eye, EyeOff, LogIn, Sparkles, Sun, Moon, Phone, ArrowRight, User, Home, MapPin } from 'lucide-react';
 
-type LoginMode = 'phone' | 'email' | 'name';
+type LoginMode = 'phone' | 'email' | 'name' | 'cell';
+
+interface PublicCell {
+  id: number;
+  name: string;
+  description?: string;
+  address?: string;
+}
 
 export default function Login() {
-  const { user, login, phoneLogin, phoneRegister } = useAuth();
+  const { user, login, phoneLogin, phoneRegister, selectCell } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
   const [mode, setMode] = useState<LoginMode>('phone');
@@ -16,10 +24,28 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
+  const [selectedCellId, setSelectedCellId] = useState<number | null>(null);
+  const [cells, setCells] = useState<PublicCell[]>([]);
+  const [loadingCells, setLoadingCells] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Para o fluxo de "usuário existente sem célula"
+  const [isExistingUserNeedsCell, setIsExistingUserNeedsCell] = useState(false);
 
   if (user) return <Navigate to="/cronograma" replace />;
+
+  const loadCells = async () => {
+    if (cells.length > 0) return; // Já carregou
+    setLoadingCells(true);
+    try {
+      const data = await api.getPublicCells();
+      setCells(data);
+    } catch {
+      // silently fail
+    } finally {
+      setLoadingCells(false);
+    }
+  };
 
   const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 11);
@@ -43,11 +69,21 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      await phoneLogin(phone);
+      const result = await phoneLogin(phone);
+      if (result.needs_cell) {
+        // Usuário existe mas não tem célula
+        setIsExistingUserNeedsCell(true);
+        setMode('cell');
+        loadCells();
+      }
+      // Se não precisa de célula, o AuthContext já setou o user e vai redirecionar
     } catch (err: unknown) {
       const message = (err as Error).message;
       if (message === 'Número não cadastrado') {
+        // Novo usuário: pedir nome + célula
+        setIsExistingUserNeedsCell(false);
         setMode('name');
+        loadCells();
       } else {
         setError(message);
       }
@@ -62,10 +98,31 @@ export default function Login() {
       setError('Digite seu nome');
       return;
     }
+    if (!selectedCellId) {
+      setError('Selecione uma célula');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
-      await phoneRegister(name.trim(), phone);
+      await phoneRegister(name.trim(), phone, selectedCellId);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCellSelect = async () => {
+    if (!selectedCellId) {
+      setError('Selecione uma célula');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await selectCell(selectedCellId);
+      // AuthContext vai setar o user e redirecionar
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -168,30 +225,127 @@ export default function Login() {
             <>
               <div className="flex items-center gap-2 mb-2">
                 <User className="w-4 h-4 text-accent-500" />
-                <h2 className="text-lg font-bold text-dark-50">Qual é o seu nome?</h2>
+                <h2 className="text-lg font-bold text-dark-50">Cadastro</h2>
               </div>
               <p className="text-sm text-dark-500 mb-5">
                 O número <span className="text-dark-300 font-medium">{phone}</span> ainda não está cadastrado.
               </p>
 
-              <form onSubmit={handleNameSubmit}>
-                <label className="block text-sm font-medium text-dark-300 mb-2">Seu nome</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => { setName(e.target.value); setError(''); }}
-                  className="input-field mb-4"
-                  placeholder="Digite seu nome completo"
-                  autoFocus
-                  required
-                />
-                <button type="submit" disabled={loading} className="btn-primary w-full !py-3">
+              <form onSubmit={handleNameSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-dark-300 mb-2">Seu nome</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => { setName(e.target.value); setError(''); }}
+                    className="input-field"
+                    placeholder="Digite seu nome completo"
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-dark-300 mb-2">Sua célula</label>
+                  {loadingCells ? (
+                    <div className="flex items-center justify-center py-4"><div className="spinner w-5 h-5" /></div>
+                  ) : cells.length === 0 ? (
+                    <p className="text-sm text-dark-600 py-2">Nenhuma célula disponível</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {cells.map((cell) => (
+                        <button
+                          key={cell.id}
+                          type="button"
+                          onClick={() => { setSelectedCellId(cell.id); setError(''); }}
+                          className={`w-full text-left p-3 rounded-xl border transition-all duration-200 ${
+                            selectedCellId === cell.id
+                              ? 'border-gold-500/50 bg-gold-500/10 shadow-[0_2px_10px_rgba(217,115,26,0.12)]'
+                              : 'border-dark-800 bg-dark-850/50 hover:border-dark-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Home className={`w-4 h-4 flex-shrink-0 ${selectedCellId === cell.id ? 'text-gold-500' : 'text-dark-600'}`} />
+                            <div className="min-w-0 flex-1">
+                              <p className={`font-semibold text-sm ${selectedCellId === cell.id ? 'text-gold-400' : 'text-dark-200'}`}>{cell.name}</p>
+                              {cell.address && (
+                                <p className="text-xs text-dark-500 flex items-center gap-1 mt-0.5 truncate">
+                                  <MapPin className="w-3 h-3 flex-shrink-0" />{cell.address}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button type="submit" disabled={loading || !selectedCellId} className="btn-primary w-full !py-3">
                   {loading ? <div className="spinner w-5 h-5" /> : <><ArrowRight className="w-4 h-4" />Cadastrar e entrar</>}
                 </button>
               </form>
 
               <button
-                onClick={() => { setMode('phone'); setError(''); }}
+                onClick={() => { setMode('phone'); setError(''); setSelectedCellId(null); }}
+                className="mt-4 text-sm text-dark-500 hover:text-dark-300 transition-colors w-full text-center"
+              >
+                ← Voltar
+              </button>
+            </>
+          ) : mode === 'cell' ? (
+            <>
+              <div className="flex items-center gap-2 mb-2">
+                <Home className="w-4 h-4 text-accent-500" />
+                <h2 className="text-lg font-bold text-dark-50">Escolha sua célula</h2>
+              </div>
+              <p className="text-sm text-dark-500 mb-5">
+                Selecione a célula da qual você participa.
+              </p>
+
+              {loadingCells ? (
+                <div className="flex items-center justify-center py-8"><div className="spinner w-6 h-6" /></div>
+              ) : cells.length === 0 ? (
+                <p className="text-sm text-dark-600 py-4 text-center">Nenhuma célula disponível</p>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1 mb-5">
+                  {cells.map((cell) => (
+                    <button
+                      key={cell.id}
+                      type="button"
+                      onClick={() => { setSelectedCellId(cell.id); setError(''); }}
+                      className={`w-full text-left p-3 rounded-xl border transition-all duration-200 ${
+                        selectedCellId === cell.id
+                          ? 'border-gold-500/50 bg-gold-500/10 shadow-[0_2px_10px_rgba(217,115,26,0.12)]'
+                          : 'border-dark-800 bg-dark-850/50 hover:border-dark-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Home className={`w-4 h-4 flex-shrink-0 ${selectedCellId === cell.id ? 'text-gold-500' : 'text-dark-600'}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className={`font-semibold text-sm ${selectedCellId === cell.id ? 'text-gold-400' : 'text-dark-200'}`}>{cell.name}</p>
+                          {cell.address && (
+                            <p className="text-xs text-dark-500 flex items-center gap-1 mt-0.5 truncate">
+                              <MapPin className="w-3 h-3 flex-shrink-0" />{cell.address}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={handleCellSelect}
+                disabled={loading || !selectedCellId}
+                className="btn-primary w-full !py-3"
+              >
+                {loading ? <div className="spinner w-5 h-5" /> : <><ArrowRight className="w-4 h-4" />Continuar</>}
+              </button>
+
+              <button
+                onClick={() => { setMode('phone'); setError(''); setSelectedCellId(null); setIsExistingUserNeedsCell(false); }}
                 className="mt-4 text-sm text-dark-500 hover:text-dark-300 transition-colors w-full text-center"
               >
                 ← Voltar

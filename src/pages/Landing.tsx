@@ -13,13 +13,12 @@ import {
 
 
 interface PublicSchedule {
-  id: number;
   title: string;
   date: string;
   time: string;
   location: string;
   cell_name?: string;
-  confirmed_count: number;
+  member_count?: number;
 }
 
 export default function Landing() {
@@ -109,11 +108,11 @@ export default function Landing() {
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {schedules.slice(0, 6).map((schedule) => {
+              {schedules.slice(0, 6).map((schedule, i) => {
                 const { dayName, day, month } = formatDate(schedule.date);
                 return (
                   <div
-                    key={schedule.id}
+                    key={`${schedule.title}-${schedule.date}-${i}`}
                     className="card-hover group"
                     style={{ border: '1px solid rgba(217,115,26,0.1)' }}
                   >
