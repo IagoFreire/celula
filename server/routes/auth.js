@@ -66,6 +66,72 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// Login por celular (sem senha)
+router.post('/phone-login', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ error: 'Número de celular é obrigatório' });
+    }
+
+    const user = await db.findUserByPhone(phone);
+    if (!user) {
+      return res.status(404).json({ error: 'not_found', message: 'Número não cadastrado' });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, name: user.name, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token,
+      user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Registro por celular (sem senha)
+router.post('/phone-register', async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+    if (!name || !phone) {
+      return res.status(400).json({ error: 'Nome e celular são obrigatórios' });
+    }
+
+    // Verifica se já existe
+    const existing = await db.findUserByPhone(phone);
+    if (existing) {
+      return res.status(409).json({ error: 'Número já cadastrado' });
+    }
+
+    // Cria com email gerado a partir do telefone e senha aleatória
+    const cleanPhone = phone.replace(/\D/g, '');
+    const fakeEmail = `phone_${cleanPhone}@celula.local`;
+    const randomPass = bcrypt.hashSync(Math.random().toString(36), 10);
+
+    const user = await db.createUser({ name, email: fakeEmail, password: randomPass, phone, role: 'member' });
+
+    const token = jwt.sign(
+      { id: user.id, name, email: fakeEmail, role: 'member' },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.status(201).json({
+      token,
+      user: { id: user.id, name, email: fakeEmail, phone, role: 'member' },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 // Dados do usuário logado
 router.get('/me', authenticateToken, async (req, res) => {
   try {

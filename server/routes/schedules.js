@@ -4,6 +4,25 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
+// Endpoint público - cronogramas (sem autenticação)
+router.get('/public', async (req, res) => {
+  try {
+    // Tenta pegar próximos, se não houver pega todos
+    let schedules = await db.getUpcomingSchedules();
+    if (schedules.length === 0) {
+      schedules = await db.getAllSchedules();
+    }
+    // Retorna apenas dados públicos (sem notas internas)
+    const publicSchedules = schedules.map(({ id, title, date, time, location, cell_name, confirmed_count }) => ({
+      id, title, date, time, location, cell_name, confirmed_count,
+    }));
+    res.json(publicSchedules);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar cronogramas' });
+  }
+});
+
 router.get('/', authenticateToken, async (req, res) => {
   try {
     res.json(await db.getAllSchedules());
@@ -15,7 +34,11 @@ router.get('/', authenticateToken, async (req, res) => {
 
 router.get('/upcoming', authenticateToken, async (req, res) => {
   try {
-    res.json(await db.getUpcomingSchedules());
+    let schedules = await db.getUpcomingSchedules();
+    if (schedules.length === 0) {
+      schedules = await db.getAllSchedules();
+    }
+    res.json(schedules);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar próximas reuniões' });

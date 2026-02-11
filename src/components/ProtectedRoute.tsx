@@ -11,7 +11,7 @@ export default function ProtectedRoute({ children, requireAdmin }: ProtectedRout
   const { user, isAdmin } = useAuth();
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   if (requireAdmin && !isAdmin) {

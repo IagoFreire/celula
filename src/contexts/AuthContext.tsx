@@ -6,6 +6,8 @@ interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<{ token: string; user: User }>;
   register: (name: string, email: string, password: string, phone?: string) => Promise<{ token: string; user: User }>;
+  phoneLogin: (phone: string) => Promise<{ token: string; user: User }>;
+  phoneRegister: (name: string, phone: string) => Promise<{ token: string; user: User }>;
   logout: () => void;
   loading: boolean;
   isAdmin: boolean;
@@ -48,6 +50,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data;
   };
 
+  const phoneLogin = async (phone: string) => {
+    const data = await api.phoneLogin(phone);
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user);
+    return data;
+  };
+
+  const phoneRegister = async (name: string, phone: string) => {
+    const data = await api.phoneRegister(name, phone);
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user);
+    return data;
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -57,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = user?.role === 'admin';
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, isAdmin }}>
+    <AuthContext.Provider value={{ user, login, register, phoneLogin, phoneRegister, logout, loading, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

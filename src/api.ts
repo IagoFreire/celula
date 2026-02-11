@@ -37,8 +37,9 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   });
 
   if (response.status === 401 || response.status === 403) {
-    // Token inválido - fazer logout
-    if (response.status === 401) {
+    // Token inválido - fazer logout (mas não redirecionar em rotas de autenticação)
+    const isAuthRoute = endpoint.startsWith('/auth/');
+    if (response.status === 401 && !isAuthRoute) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
@@ -48,7 +49,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || 'Erro na requisição');
+    throw new Error(data.message || data.error || 'Erro na requisição');
   }
 
   return data as T;
@@ -58,6 +59,8 @@ export const api = {
   // Auth
   login: (data: LoginData) => request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   register: (data: RegisterData) => request<AuthResponse>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  phoneLogin: (phone: string) => request<AuthResponse>('/auth/phone-login', { method: 'POST', body: JSON.stringify({ phone }) }),
+  phoneRegister: (name: string, phone: string) => request<AuthResponse>('/auth/phone-register', { method: 'POST', body: JSON.stringify({ name, phone }) }),
   getMe: () => request<User>('/auth/me'),
 
   // Schedules

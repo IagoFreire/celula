@@ -8,6 +8,15 @@ export const db = {
     return rows[0] || null;
   },
 
+  async findUserByPhone(phone) {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const { rows } = await pool.query(
+      `SELECT * FROM users WHERE REGEXP_REPLACE(phone, '\\D', '', 'g') = $1`,
+      [cleanPhone]
+    );
+    return rows[0] || null;
+  },
+
   async findUserById(id) {
     const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
     return rows[0] || null;
