@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../database.js';
-import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, requireAdminOrLeader } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -14,7 +14,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:id', authenticateToken, requireAdminOrLeader, async (req, res) => {
   try {
     const member = await db.getUserWithHistory(Number(req.params.id));
     if (!member) return res.status(404).json({ error: 'Membro não encontrado' });

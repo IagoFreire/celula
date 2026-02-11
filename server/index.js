@@ -12,6 +12,7 @@ import financesRoutes from './routes/finances.js';
 import studiesRoutes from './routes/studies.js';
 import membersRoutes from './routes/members.js';
 import cellsRoutes from './routes/cells.js';
+import attendanceValidationRoutes from './routes/attendance-validation.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -37,6 +38,7 @@ app.use('/api/finances', financesRoutes);
 app.use('/api/studies', studiesRoutes);
 app.use('/api/members', membersRoutes);
 app.use('/api/cells', cellsRoutes);
+app.use('/api/attendance-validation', attendanceValidationRoutes);
 
 // Servir frontend em produção
 if (process.env.NODE_ENV === 'production') {

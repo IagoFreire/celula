@@ -13,6 +13,9 @@ import AdminSchedules from './pages/admin/Schedules';
 import AdminFinances from './pages/admin/Finances';
 import AdminStudyLibrary from './pages/admin/StudyLibrary';
 import AdminCells from './pages/admin/Cells';
+import AdminLeaders from './pages/admin/Leaders';
+import AdminAttendanceValidation from './pages/admin/AttendanceValidation';
+import ChangePassword from './pages/ChangePassword';
 
 export default function App() {
   const { loading } = useAuth();
@@ -48,12 +51,18 @@ export default function App() {
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/cronograma" element={<Schedule />} />
         <Route path="/estudos" element={<Studies />} />
+        <Route path="/alterar-senha" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
 
-        <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>} />
-        <Route path="/admin/cronogramas" element={<ProtectedRoute requireAdmin><AdminSchedules /></ProtectedRoute>} />
-        <Route path="/admin/financas" element={<ProtectedRoute requireAdmin><AdminFinances /></ProtectedRoute>} />
-        <Route path="/admin/estudos" element={<ProtectedRoute requireAdmin><AdminStudyLibrary /></ProtectedRoute>} />
-        <Route path="/admin/celulas" element={<ProtectedRoute requireAdmin><AdminCells /></ProtectedRoute>} />
+        {/* Rotas acessíveis por admin e líder */}
+        <Route path="/admin" element={<ProtectedRoute requireAdminOrLeader><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin/cronogramas" element={<ProtectedRoute requireAdminOrLeader><AdminSchedules /></ProtectedRoute>} />
+        <Route path="/admin/financas" element={<ProtectedRoute requireAdminOrLeader><AdminFinances /></ProtectedRoute>} />
+        <Route path="/admin/estudos" element={<ProtectedRoute requireAdminOrLeader><AdminStudyLibrary /></ProtectedRoute>} />
+        <Route path="/admin/celulas" element={<ProtectedRoute requireAdminOrLeader><AdminCells /></ProtectedRoute>} />
+        <Route path="/admin/presenca" element={<ProtectedRoute requireAdminOrLeader><AdminAttendanceValidation /></ProtectedRoute>} />
+        
+        {/* Rotas exclusivas do admin */}
+        <Route path="/admin/lideres" element={<ProtectedRoute requireAdmin><AdminLeaders /></ProtectedRoute>} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

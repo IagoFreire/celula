@@ -95,10 +95,11 @@ export const db = {
   // --- Cells ---
   async getAllCells() {
     const { rows } = await pool.query(`
-      SELECT c.*, COUNT(u.id)::int AS member_count
+      SELECT c.*, COUNT(u.id)::int AS member_count, leader.name AS leader_name, leader.email AS leader_email
       FROM cells c
       LEFT JOIN users u ON u.cell_id = c.id AND u.role = 'member'
-      GROUP BY c.id
+      LEFT JOIN users leader ON leader.id = c.leader_id
+      GROUP BY c.id, leader.name, leader.email
       ORDER BY c.name
     `);
     return rows;
@@ -291,6 +292,128 @@ export const db = {
       if (cmp !== 0) return cmp;
       return (a.time || '').localeCompare(b.time || '');
     });
+
+    return meetings;
+  },
+
+  // Gerar cronograma incluindo reuniões passadas (para validação de presença)
+  async generateCellScheduleWithPast(cellId, monthsBack = 3) {
+    // Busca a célula específica
+    const { rows: cells } = await pool.query(`
+      SELECT c.*, COUNT(u.id)::int AS member_count
+      FROM cells c
+      LEFT JOIN users u ON u.cell_id = c.id AND u.role = 'member'
+      WHERE c.day_of_week IS NOT NULL AND c.id = $1
+      GROUP BY c.id
+    `, [cellId]);
+
+    if (cells.length === 0) return [];
+
+    // Busca cancelamentos
+    const { rows: cancellations } = await pool.query(
+      'SELECT cell_id, date, reason FROM schedule_cancellations WHERE cell_id = $1',
+      [cellId]
+    );
+    const cancelMap = new Map();
+    for (const c of cancellations) {
+      const key = `${c.cell_id}_${c.date instanceof Date ? c.date.toISOString().split('T')[0] : String(c.date).split('T')[0]}`;
+      cancelMap.set(key, c.reason);
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Limite do passado
+    const pastLimit = new Date(today);
+    pastLimit.setMonth(pastLimit.getMonth() - monthsBack);
+
+    // Limite do futuro (incluir hoje + 1 dia para pegar reunião de hoje)
+    const futureLimit = new Date(today);
+    futureLimit.setDate(futureLimit.getDate() + 1);
+
+    const meetings = [];
+    const cell = cells[0];
+    const targetDay = cell.day_of_week;
+
+    // Ponto de partida: referência base da célula
+    let startDate;
+    if (cell.next_date) {
+      const nd = cell.next_date instanceof Date
+        ? cell.next_date
+        : new Date(String(cell.next_date).split('T')[0] + 'T00:00:00');
+      startDate = new Date(nd);
+    } else if (cell.created_at) {
+      startDate = new Date(cell.created_at);
+      startDate.setHours(0, 0, 0, 0);
+    } else {
+      startDate = new Date(pastLimit);
+    }
+
+    // Retroceder a startDate até antes de pastLimit para cobrir todo o período
+    // Primeiro ajustar para o dia correto da semana
+    const diffToTarget = (targetDay - startDate.getDay() + 7) % 7;
+    startDate.setDate(startDate.getDate() + (diffToTarget === 0 ? 0 : diffToTarget));
+
+    // Voltar no tempo até antes de pastLimit
+    while (startDate > pastLimit) {
+      if (cell.frequency === 'biweekly') {
+        startDate.setDate(startDate.getDate() - 14);
+      } else if (cell.frequency === 'monthly') {
+        startDate.setMonth(startDate.getMonth() - 1);
+        const newDiff = (targetDay - startDate.getDay() + 7) % 7;
+        startDate.setDate(startDate.getDate() + newDiff);
+      } else {
+        startDate.setDate(startDate.getDate() - 7);
+      }
+    }
+
+    // Avançar até pastLimit
+    while (startDate < pastLimit) {
+      if (cell.frequency === 'biweekly') {
+        startDate.setDate(startDate.getDate() + 14);
+      } else if (cell.frequency === 'monthly') {
+        startDate.setMonth(startDate.getMonth() + 1);
+        const newDiff = (targetDay - startDate.getDay() + 7) % 7;
+        startDate.setDate(startDate.getDate() + newDiff);
+      } else {
+        startDate.setDate(startDate.getDate() + 7);
+      }
+    }
+
+    // Gerar reuniões de pastLimit até hoje (inclusive)
+    let current = new Date(startDate);
+    while (current <= futureLimit) {
+      const dateStr = current.toISOString().split('T')[0];
+      const cancelKey = `${cell.id}_${dateStr}`;
+      const isCancelled = cancelMap.has(cancelKey);
+
+      meetings.push({
+        cell_id: cell.id,
+        title: cell.name,
+        date: dateStr,
+        time: cell.meeting_time || '19:00',
+        location: cell.address || 'A definir',
+        cell_name: cell.name,
+        description: cell.description,
+        frequency: cell.frequency,
+        member_count: cell.member_count,
+        cancelled: isCancelled,
+        cancel_reason: isCancelled ? cancelMap.get(cancelKey) : null,
+      });
+
+      if (cell.frequency === 'biweekly') {
+        current.setDate(current.getDate() + 14);
+      } else if (cell.frequency === 'monthly') {
+        current.setMonth(current.getMonth() + 1);
+        const newDiff = (targetDay - current.getDay() + 7) % 7;
+        current.setDate(current.getDate() + newDiff);
+      } else {
+        current.setDate(current.getDate() + 7);
+      }
+    }
+
+    // Ordenar do mais recente pro mais antigo
+    meetings.sort((a, b) => b.date.localeCompare(a.date));
 
     return meetings;
   },
@@ -586,6 +709,170 @@ export const db = {
   async deleteStudy(id) {
     const { rows } = await pool.query('DELETE FROM studies WHERE id = $1 RETURNING *', [id]);
     return rows[0] || null;
+  },
+
+  // --- Meeting Attendance (reuniões geradas) ---
+  async confirmMeetingAttendance(cellId, date, userId) {
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO meeting_attendance (cell_id, date, user_id) 
+         VALUES ($1, $2, $3) RETURNING *`,
+        [cellId, date, userId]
+      );
+      return rows[0];
+    } catch (err) {
+      if (err.code === '23505') return null; // já confirmado
+      throw err;
+    }
+  },
+
+  async cancelMeetingAttendance(cellId, date, userId) {
+    await pool.query(
+      'DELETE FROM meeting_attendance WHERE cell_id = $1 AND date = $2 AND user_id = $3',
+      [cellId, date, userId]
+    );
+  },
+
+  async checkMeetingAttendance(cellId, date, userId) {
+    const { rows } = await pool.query(
+      'SELECT 1 FROM meeting_attendance WHERE cell_id = $1 AND date = $2 AND user_id = $3',
+      [cellId, date, userId]
+    );
+    return rows.length > 0;
+  },
+
+  async getMeetingAttendanceCount(cellId, date) {
+    const { rows } = await pool.query(
+      'SELECT COUNT(*)::int AS count FROM meeting_attendance WHERE cell_id = $1 AND date = $2',
+      [cellId, date]
+    );
+    return rows[0].count;
+  },
+
+  async getMyMeetingAttendances(userId) {
+    const { rows } = await pool.query(
+      `SELECT ma.cell_id, ma.date, c.name AS cell_name
+       FROM meeting_attendance ma
+       JOIN cells c ON c.id = ma.cell_id
+       WHERE ma.user_id = $1
+       ORDER BY ma.date DESC`,
+      [userId]
+    );
+    return rows;
+  },
+
+  async getMeetingAttendanceBatch(cellDates, userId) {
+    // Recebe array de { cell_id, date } e retorna quais o user confirmou
+    if (!cellDates.length) return [];
+    const values = cellDates.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(', ');
+    const params = cellDates.flatMap(cd => [cd.cell_id, cd.date]);
+    const { rows } = await pool.query(
+      `SELECT cell_id, date::text FROM meeting_attendance 
+       WHERE user_id = $${params.length + 1} AND (cell_id, date) IN (${values})`,
+      [...params, userId]
+    );
+    return rows;
+  },
+
+  async getMeetingAttendanceCountBatch(cellDates) {
+    // Recebe array de { cell_id, date } e retorna contagens
+    if (!cellDates.length) return [];
+    const values = cellDates.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(', ');
+    const params = cellDates.flatMap(cd => [cd.cell_id, cd.date]);
+    const { rows } = await pool.query(
+      `SELECT cell_id, date::text, COUNT(*)::int AS count FROM meeting_attendance 
+       WHERE (cell_id, date) IN (${values})
+       GROUP BY cell_id, date`,
+      params
+    );
+    return rows;
+  },
+
+  // --- Attendance Validation (validação real de presença pelo líder) ---
+  async validateAttendance(cellId, date, userIds, validatedBy) {
+    // userIds = array de { user_id, was_confirmed }
+    const results = [];
+    for (const item of userIds) {
+      try {
+        const { rows } = await pool.query(
+          `INSERT INTO attendance_validation (cell_id, date, user_id, was_confirmed, validated_by)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (cell_id, date, user_id) DO UPDATE SET was_confirmed = $4, validated_by = $5, validated_at = NOW()
+           RETURNING *`,
+          [cellId, date, item.user_id, item.was_confirmed, validatedBy]
+        );
+        results.push(rows[0]);
+      } catch (err) {
+        console.error('Erro ao validar presença:', err);
+      }
+    }
+    return results;
+  },
+
+  async removeValidatedAttendance(cellId, date, userId) {
+    await pool.query(
+      'DELETE FROM attendance_validation WHERE cell_id = $1 AND date = $2 AND user_id = $3',
+      [cellId, date, userId]
+    );
+  },
+
+  async getValidatedAttendance(cellId, date) {
+    const { rows } = await pool.query(`
+      SELECT av.*, u.name AS user_name, u.phone AS user_phone, vb.name AS validated_by_name
+      FROM attendance_validation av
+      JOIN users u ON u.id = av.user_id
+      LEFT JOIN users vb ON vb.id = av.validated_by
+      WHERE av.cell_id = $1 AND av.date = $2
+      ORDER BY u.name
+    `, [cellId, date]);
+    return rows;
+  },
+
+  async getValidationHistory(cellId, limit = 50) {
+    const { rows } = await pool.query(`
+      SELECT av.cell_id, av.date, c.name AS cell_name,
+             COUNT(*)::int AS total_present,
+             COUNT(*) FILTER (WHERE av.was_confirmed)::int AS confirmed_present,
+             COUNT(*) FILTER (WHERE NOT av.was_confirmed)::int AS unconfirmed_present,
+             MIN(av.validated_at) AS validated_at
+      FROM attendance_validation av
+      JOIN cells c ON c.id = av.cell_id
+      WHERE ($1::int IS NULL OR av.cell_id = $1)
+      GROUP BY av.cell_id, av.date, c.name
+      ORDER BY av.date DESC
+      LIMIT $2
+    `, [cellId || null, limit]);
+    return rows;
+  },
+
+  async getValidationDetail(cellId, date) {
+    const { rows } = await pool.query(`
+      SELECT av.*, u.name AS user_name, u.phone AS user_phone
+      FROM attendance_validation av
+      JOIN users u ON u.id = av.user_id
+      WHERE av.cell_id = $1 AND av.date = $2
+      ORDER BY u.name
+    `, [cellId, date]);
+    return rows;
+  },
+
+  async getMeetingConfirmedUsers(cellId, date) {
+    const { rows } = await pool.query(`
+      SELECT ma.user_id, u.name, u.phone
+      FROM meeting_attendance ma
+      JOIN users u ON u.id = ma.user_id
+      WHERE ma.cell_id = $1 AND ma.date = $2
+      ORDER BY u.name
+    `, [cellId, date]);
+    return rows;
+  },
+
+  async isValidated(cellId, date) {
+    const { rows } = await pool.query(
+      'SELECT 1 FROM attendance_validation WHERE cell_id = $1 AND date = $2 LIMIT 1',
+      [cellId, date]
+    );
+    return rows.length > 0;
   },
 
   // --- Helpers ---

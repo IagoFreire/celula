@@ -4,7 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   Calendar, BookOpen, LayoutDashboard, DollarSign, Library, Home,
-  LogOut, Menu, X, Church, CalendarDays, Sparkles, Sun, Moon,
+  LogOut, Menu, X, Church, CalendarDays, Sparkles, Sun, Moon, KeyRound, Users2,
+  ClipboardCheck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -15,7 +16,7 @@ interface NavItemProps {
 }
 
 export default function Layout() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isLeader, isAdminOrLeader } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
   const navigate = useNavigate();
@@ -27,13 +28,29 @@ export default function Layout() {
     { to: '/cronograma', icon: Calendar, label: 'Cronograma' },
     { to: '/estudos', icon: BookOpen, label: 'Estudos' },
   ];
+
+  // Links de admin (completo)
   const adminLinks: NavItemProps[] = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/admin/cronogramas', icon: CalendarDays, label: 'Cronogramas' },
     { to: '/admin/financas', icon: DollarSign, label: 'Finanças' },
     { to: '/admin/estudos', icon: Library, label: 'Estudos' },
     { to: '/admin/celulas', icon: Home, label: 'Células' },
+    { to: '/admin/presenca', icon: ClipboardCheck, label: 'Validar Presença' },
+    ...(isAdmin ? [{ to: '/admin/lideres', icon: Users2, label: 'Líderes' }] : []),
   ];
+
+  // Links de líder (apenas o que ele pode acessar)
+  const leaderLinks: NavItemProps[] = [
+    { to: '/admin/cronogramas', icon: CalendarDays, label: 'Cronogramas' },
+    { to: '/admin/financas', icon: DollarSign, label: 'Finanças' },
+    { to: '/admin/estudos', icon: Library, label: 'Estudos' },
+    { to: '/admin/celulas', icon: Home, label: 'Minha Célula' },
+    { to: '/admin/presenca', icon: ClipboardCheck, label: 'Validar Presença' },
+    { to: '/alterar-senha', icon: KeyRound, label: 'Alterar Senha' },
+  ];
+
+  const managementLinks = isAdmin ? adminLinks : isLeader ? leaderLinks : [];
 
   const NavItem = ({ to, icon: Icon, label }: NavItemProps) => (
     <NavLink
@@ -109,13 +126,13 @@ export default function Layout() {
           <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-1">
             <p className="px-4 py-2 text-[10px] font-bold text-dark-500 uppercase tracking-[0.15em]">Menu</p>
             {memberLinks.map((link) => <NavItem key={link.to} {...link} />)}
-            {isAdmin && (
+            {isAdminOrLeader && (
               <>
                 <div className="my-4 divider-gold" />
                 <p className="px-4 py-2 text-[10px] font-bold text-dark-500 uppercase tracking-[0.15em] flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 text-accent-500" />Administração
+                  <Sparkles className="w-3 h-3 text-accent-500" />{isAdmin ? 'Administração' : 'Gestão da Célula'}
                 </p>
-                {adminLinks.map((link) => <NavItem key={link.to} {...link} />)}
+                {managementLinks.map((link) => <NavItem key={link.to} {...link} />)}
               </>
             )}
           </nav>
@@ -139,7 +156,9 @@ export default function Layout() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-dark-50 truncate">{user?.name}</p>
-                <p className="text-[11px] text-dark-500 truncate">{isAdmin ? '✦ Administrador' : 'Membro'}</p>
+                <p className="text-[11px] text-dark-500 truncate">
+                  {isAdmin ? '✦ Administrador' : isLeader ? '✦ Líder de Célula' : 'Membro'}
+                </p>
               </div>
             </div>
             <button

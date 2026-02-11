@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api';
+import { useAuth } from '../contexts/AuthContext';
 import {
   Calendar,
   MapPin,
@@ -7,6 +8,9 @@ import {
   Users,
   XCircle,
   AlertTriangle,
+  CheckCircle2,
+  UserCheck,
+  Loader2,
 } from 'lucide-react';
 
 interface GeneratedMeeting {
@@ -30,18 +34,80 @@ const FREQ_LABELS: Record<string, string> = {
 };
 
 export default function Schedule() {
+  const { user, isAdminOrLeader } = useAuth();
   const [meetings, setMeetings] = useState<GeneratedMeeting[]>([]);
   const [loading, setLoading] = useState(true);
+  // Map de "cell_id_date" -> true/false para presença confirmada
+  const [confirmedMap, setConfirmedMap] = useState<Record<string, boolean>>({});
+  // Map de "cell_id_date" -> count de confirmações
+  const [countMap, setCountMap] = useState<Record<string, number>>({});
+  // Set de chaves em loading (botão individual)
+  const [togglingSet, setTogglingSet] = useState<Set<string>>(new Set());
 
-  useEffect(() => { loadData(); }, []);
+  const meetingKey = (cellId: number, date: string) => `${cellId}_${date}`;
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.getUpcomingSchedules();
-      setMeetings(data as unknown as GeneratedMeeting[]);
+      const meetingsData = data as unknown as GeneratedMeeting[];
+      setMeetings(meetingsData);
+
+      // Buscar status de presença em batch para reuniões não canceladas
+      const activeMeetings = meetingsData.filter(m => !m.cancelled);
+      if (activeMeetings.length > 0 && user) {
+        const uniqueMeetings = Array.from(
+          new Map(activeMeetings.map(m => [meetingKey(m.cell_id, m.date), { cell_id: m.cell_id, date: m.date }])).values()
+        );
+        const { confirmed, counts } = await api.checkMeetingAttendanceBatch(uniqueMeetings);
+        
+        const cMap: Record<string, boolean> = {};
+        for (const c of confirmed) {
+          cMap[meetingKey(c.cell_id, c.date)] = true;
+        }
+        setConfirmedMap(cMap);
+
+        const ctMap: Record<string, number> = {};
+        for (const ct of counts) {
+          ctMap[meetingKey(ct.cell_id, ct.date)] = ct.count;
+        }
+        setCountMap(ctMap);
+      }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
+  }, [user]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const toggleAttendance = async (cellId: number, date: string) => {
+    const key = meetingKey(cellId, date);
+    if (togglingSet.has(key)) return;
+
+    setTogglingSet(prev => new Set(prev).add(key));
+    try {
+      const isConfirmed = confirmedMap[key];
+      if (isConfirmed) {
+        await api.cancelMeetingAttendance(cellId, date);
+        setConfirmedMap(prev => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+        setCountMap(prev => ({ ...prev, [key]: Math.max(0, (prev[key] || 1) - 1) }));
+      } else {
+        await api.confirmMeetingAttendance(cellId, date);
+        setConfirmedMap(prev => ({ ...prev, [key]: true }));
+        setCountMap(prev => ({ ...prev, [key]: (prev[key] || 0) + 1 }));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTogglingSet(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -80,6 +146,10 @@ export default function Schedule() {
         <div className="space-y-4">
           {meetings.map((meeting, i) => {
             const date = formatDate(meeting.date);
+            const key = meetingKey(meeting.cell_id, meeting.date);
+            const isConfirmed = !!confirmedMap[key];
+            const attendanceCount = countMap[key] || 0;
+            const isToggling = togglingSet.has(key);
 
             return (
               <div
@@ -131,10 +201,16 @@ export default function Schedule() {
                             <MapPin className="w-3.5 h-3.5 text-gold-600" />
                             {meeting.location}
                           </span>
-                          {meeting.member_count != null && (
+                          {isAdminOrLeader && meeting.member_count != null && (
                             <span className="flex items-center gap-1.5">
                               <Users className="w-3.5 h-3.5 text-gold-600" />
                               {meeting.member_count} membro{meeting.member_count !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {isAdminOrLeader && attendanceCount > 0 && (
+                            <span className="flex items-center gap-1.5 text-emerald-400">
+                              <UserCheck className="w-3.5 h-3.5" />
+                              {attendanceCount} confirmado{attendanceCount !== 1 ? 's' : ''}
                             </span>
                           )}
                         </div>
@@ -145,6 +221,28 @@ export default function Schedule() {
 
                         {meeting.description && (
                           <p className="mt-2 text-sm text-dark-600 line-clamp-2">{meeting.description}</p>
+                        )}
+
+                        {/* Botão de Confirmar Presença */}
+                        {user && (
+                          <button
+                            onClick={() => toggleAttendance(meeting.cell_id, meeting.date)}
+                            disabled={isToggling}
+                            className={`mt-3 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                              isConfirmed
+                                ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20'
+                                : 'bg-gold-500/10 text-gold-400 hover:bg-gold-500/20 border border-gold-500/20'
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            {isToggling ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : isConfirmed ? (
+                              <CheckCircle2 className="w-4 h-4" />
+                            ) : (
+                              <UserCheck className="w-4 h-4" />
+                            )}
+                            {isConfirmed ? 'Presença Confirmada' : 'Confirmar Presença'}
+                          </button>
                         )}
                       </>
                     )}

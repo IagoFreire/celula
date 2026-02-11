@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
+import { useAuth } from '../../contexts/AuthContext';
 import type { LucideIcon } from 'lucide-react';
 import {
   Users,
@@ -35,6 +36,7 @@ interface DashboardCard {
 }
 
 export default function Dashboard() {
+  const { isLeader } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -78,7 +80,7 @@ export default function Dashboard() {
           <Sparkles className="w-6 h-6 text-accent-500" />
           Dashboard
         </h1>
-        <p className="page-subtitle">Visão geral da gestão</p>
+        <p className="page-subtitle">{isLeader ? 'Visão geral da sua célula' : 'Visão geral da gestão'}</p>
       </div>
 
       {/* Cards */}

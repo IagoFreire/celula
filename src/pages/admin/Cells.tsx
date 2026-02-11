@@ -1,10 +1,11 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { api } from '../../api';
+import { useAuth } from '../../contexts/AuthContext';
 import type { Cell, Member } from '../../types';
 import {
   Plus, Pencil, Trash2, X, Save, Search, Home, Users,
   Phone, ChevronRight, UserPlus, UserMinus, ArrowLeft,
-  Shield, Calendar, CheckCircle2, MapPin, Clock, Repeat,
+  Shield, Calendar, CheckCircle2, MapPin, Clock,
 } from 'lucide-react';
 
 const DAYS_OF_WEEK = [
@@ -36,12 +37,13 @@ interface CellForm {
   next_date: string;
 }
 
-interface MemberForm {
+interface MemberFormType {
   name: string;
   phone: string;
 }
 
 export default function AdminCells() {
+  const { isAdmin, isLeader } = useAuth();
   const [cells, setCells] = useState<Cell[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -59,13 +61,20 @@ export default function AdminCells() {
 
   // Member form
   const [showMemberForm, setShowMemberForm] = useState(false);
-  const [memberForm, setMemberForm] = useState<MemberForm>({ name: '', phone: '' });
+  const [memberForm, setMemberForm] = useState<MemberFormType>({ name: '', phone: '' });
 
   // Member detail
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [loadingMemberDetail, setLoadingMemberDetail] = useState(false);
 
   useEffect(() => { loadCells(); }, []);
+
+  // Se for líder, auto-selecionar a célula dele
+  useEffect(() => {
+    if (isLeader && cells.length === 1 && !selectedCell) {
+      selectCell(cells[0]);
+    }
+  }, [cells, isLeader]);
 
   const loadCells = async () => {
     try {
@@ -227,9 +236,12 @@ export default function AdminCells() {
       <div>
         {/* Header */}
         <div className="mb-6 animate-fade-in">
-          <button onClick={() => { setSelectedCell(null); setSelectedMember(null); }} className="flex items-center gap-2 text-sm text-dark-500 hover:text-dark-300 transition-colors mb-3">
-            <ArrowLeft className="w-4 h-4" />Voltar para células
-          </button>
+          {/* Líder não tem botão voltar, já que só tem uma célula */}
+          {isAdmin && (
+            <button onClick={() => { setSelectedCell(null); setSelectedMember(null); }} className="flex items-center gap-2 text-sm text-dark-500 hover:text-dark-300 transition-colors mb-3">
+              <ArrowLeft className="w-4 h-4" />Voltar para células
+            </button>
+          )}
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="page-title flex items-center gap-2">
@@ -391,6 +403,7 @@ export default function AdminCells() {
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-dark-50 text-sm truncate">{m.name}</span>
                           {m.role === 'admin' && <span className="badge-gold text-[10px]"><Shield className="w-2.5 h-2.5 mr-0.5" />Admin</span>}
+                          {m.role === 'leader' && <span className="badge-gold text-[10px]"><Shield className="w-2.5 h-2.5 mr-0.5" />Líder</span>}
                         </div>
                         <p className="text-xs text-dark-500 truncate">{m.phone || '—'}</p>
                       </div>
@@ -431,7 +444,9 @@ export default function AdminCells() {
                         <span className="text-2xl font-extrabold text-white">{selectedMember.name?.charAt(0).toUpperCase()}</span>
                       </div>
                       <h4 className="font-bold text-dark-50 text-lg">{selectedMember.name}</h4>
-                      <p className="text-sm text-dark-500">{selectedMember.role === 'admin' ? '✦ Administrador' : 'Membro'}</p>
+                      <p className="text-sm text-dark-500">
+                        {selectedMember.role === 'admin' ? '✦ Administrador' : selectedMember.role === 'leader' ? '✦ Líder' : 'Membro'}
+                      </p>
                     </div>
 
                     <div className="space-y-2.5 mb-6">
@@ -502,13 +517,15 @@ export default function AdminCells() {
             className="input-field pl-10"
           />
         </div>
-        <button onClick={() => { resetCellForm(); setShowCellForm(true); }} className="btn-primary">
-          <Plus className="w-4 h-4" />Nova Célula
-        </button>
+        {isAdmin && (
+          <button onClick={() => { resetCellForm(); setShowCellForm(true); }} className="btn-primary">
+            <Plus className="w-4 h-4" />Nova Célula
+          </button>
+        )}
       </div>
 
-      {/* Cell form */}
-      {showCellForm && (
+      {/* Cell form - apenas admin pode criar */}
+      {showCellForm && isAdmin && (
         <div className="card-gradient mb-6 animate-scale-in">
           <div className="flex items-center justify-between mb-5">
             <h3 className="font-bold text-dark-50">{editingCellId ? 'Editar Célula' : 'Nova Célula'}</h3>
@@ -606,18 +623,22 @@ export default function AdminCells() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openEditCell(c); }}
-                    className="p-1.5 hover:bg-dark-850 rounded-lg text-dark-600 hover:text-blue-400 transition-all"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteCell(c.id); }}
-                    className="p-1.5 hover:bg-dark-850 rounded-lg text-dark-600 hover:text-red-400 transition-all"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {isAdmin && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openEditCell(c); }}
+                        className="p-1.5 hover:bg-dark-850 rounded-lg text-dark-600 hover:text-blue-400 transition-all"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteCell(c.id); }}
+                        className="p-1.5 hover:bg-dark-850 rounded-lg text-dark-600 hover:text-red-400 transition-all"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
                   <ChevronRight className="w-4 h-4 text-dark-700" />
                 </div>
               </div>

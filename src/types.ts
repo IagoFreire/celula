@@ -3,7 +3,18 @@ export interface User {
   name: string;
   email?: string;
   phone?: string;
-  role: 'admin' | 'member';
+  role: 'admin' | 'member' | 'leader';
+  cell_id?: number | null;
+  created_at?: string;
+}
+
+export interface Leader {
+  id: number;
+  name: string;
+  email: string;
+  role: 'leader';
+  cell_id: number;
+  cell_name?: string;
   created_at?: string;
 }
 

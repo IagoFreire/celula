@@ -1,35 +1,52 @@
 import { Router } from 'express';
 import { db } from '../database.js';
-import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { authenticateToken, requireAdminOrLeader } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+// Helper: se for líder, forçar filtro pela célula dele
+function applyLeaderScope(req, filters = {}) {
+  if (req.user.role === 'leader' && req.user.cell_id) {
+    filters.cell_id = req.user.cell_id;
+  }
+  return filters;
+}
+
+router.get('/', authenticateToken, requireAdminOrLeader, async (req, res) => {
   try {
-    res.json(await db.getFinances(req.query));
+    const filters = applyLeaderScope(req, { ...req.query });
+    res.json(await db.getFinances(filters));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar transações' });
   }
 });
 
-router.get('/summary', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/summary', authenticateToken, requireAdminOrLeader, async (req, res) => {
   try {
-    res.json(await db.getFinanceSummary(req.query));
+    const filters = applyLeaderScope(req, { ...req.query });
+    res.json(await db.getFinanceSummary(filters));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao buscar resumo financeiro' });
   }
 });
 
-router.post('/', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/', authenticateToken, requireAdminOrLeader, async (req, res) => {
   try {
     const { cell_id, type, category, amount, description, date } = req.body;
     if (!type || !category || !amount || !date) {
       return res.status(400).json({ error: 'Tipo, categoria, valor e data são obrigatórios' });
     }
+    
+    // Líder só pode criar para sua célula
+    let finalCellId = cell_id ? Number(cell_id) : null;
+    if (req.user.role === 'leader') {
+      finalCellId = req.user.cell_id;
+    }
+    
     const fin = await db.createFinance({
-      cell_id: cell_id ? Number(cell_id) : null,
+      cell_id: finalCellId,
       type, category, amount: parseFloat(amount), description, date,
       created_by: req.user.id,
     });
@@ -40,11 +57,18 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/:id', authenticateToken, requireAdminOrLeader, async (req, res) => {
   try {
     const { cell_id, type, category, amount, description, date } = req.body;
+    
+    // Líder só pode editar da sua célula
+    let finalCellId = cell_id ? Number(cell_id) : null;
+    if (req.user.role === 'leader') {
+      finalCellId = req.user.cell_id;
+    }
+    
     await db.updateFinance(Number(req.params.id), {
-      cell_id: cell_id ? Number(cell_id) : null,
+      cell_id: finalCellId,
       type, category, amount: parseFloat(amount), description, date,
     });
     res.json({ message: 'Transação atualizada' });
@@ -54,7 +78,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, requireAdminOrLeader, async (req, res) => {
   try {
     await db.deleteFinance(Number(req.params.id));
     res.json({ message: 'Transação excluída' });

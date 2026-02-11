@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../api';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   Calendar, Clock, MapPin, CalendarDays, Users, X, XCircle, RotateCcw, AlertTriangle,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ const FREQ_LABELS: Record<string, string> = {
 };
 
 export default function AdminSchedules() {
+  const { isLeader } = useAuth();
   const [meetings, setMeetings] = useState<GeneratedMeeting[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -105,7 +107,9 @@ export default function AdminSchedules() {
     <div>
       <div className="mb-8 animate-fade-in">
         <h1 className="page-title flex items-center gap-2"><CalendarDays className="w-6 h-6 text-gold-500" />Cronograma</h1>
-        <p className="page-subtitle">Gerado automaticamente a partir das células cadastradas</p>
+        <p className="page-subtitle">
+          {isLeader ? 'Cronograma da sua célula' : 'Gerado automaticamente a partir das células cadastradas'}
+        </p>
       </div>
 
       {meetings.length === 0 ? (

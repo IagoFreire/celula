@@ -8,6 +8,7 @@ import type {
   Finance,
   FinanceSummary,
   Member,
+  Leader,
 } from './types';
 
 const API_BASE = '/api';
@@ -97,6 +98,57 @@ export const api = {
 
   // Members
   getMember: (id: number) => request<Member>(`/members/${id}`),
+
+  // Leaders
+  getLeaders: () => request<Leader[]>('/auth/leaders'),
+  createLeader: (data: { email: string; password: string; cell_id: number }) =>
+    request<Leader>('/auth/leaders', { method: 'POST', body: JSON.stringify(data) }),
+  deleteLeader: (id: number) => request<void>(`/auth/leaders/${id}`, { method: 'DELETE' }),
+
+  // Password
+  changePassword: (data: { current_password: string; new_password: string }) =>
+    request<{ message: string }>('/auth/change-password', { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Meeting Attendance (presença em reuniões geradas)
+  confirmMeetingAttendance: (cell_id: number, date: string) =>
+    request<{ message: string }>('/attendance/meeting/confirm', { method: 'POST', body: JSON.stringify({ cell_id, date }) }),
+  cancelMeetingAttendance: (cell_id: number, date: string) =>
+    request<{ message: string }>('/attendance/meeting/cancel', { method: 'DELETE', body: JSON.stringify({ cell_id, date }) }),
+  checkMeetingAttendanceBatch: (meetings: { cell_id: number; date: string }[]) =>
+    request<{ confirmed: { cell_id: number; date: string }[]; counts: { cell_id: number; date: string; count: number }[] }>(
+      '/attendance/meeting/check-batch', { method: 'POST', body: JSON.stringify({ meetings }) }
+    ),
+
+  // Attendance Validation (validação real de presença)
+  getValidationMeetings: (cellId: number) =>
+    request<Record<string, unknown>[]>(`/attendance-validation/meetings/${cellId}`),
+  prepareValidation: (cellId: number, date: string) =>
+    request<{
+      confirmed: { user_id: number; name: string; phone?: string }[];
+      allMembers: { id: number; name: string; phone?: string; role: string }[];
+      validated: { user_id: number; user_name: string; was_confirmed: boolean }[];
+    }>(`/attendance-validation/prepare/${cellId}/${date}`),
+  submitValidation: (cell_id: number, date: string, attendees: { user_id: number; was_confirmed: boolean }[]) =>
+    request<{ message: string; count: number }>('/attendance-validation/validate', {
+      method: 'POST',
+      body: JSON.stringify({ cell_id, date, attendees }),
+    }),
+  getValidationHistory: (cell_id?: number) => {
+    const query = cell_id ? `?cell_id=${cell_id}` : '';
+    return request<{
+      cell_id: number;
+      date: string;
+      cell_name: string;
+      total_present: number;
+      confirmed_present: number;
+      unconfirmed_present: number;
+      validated_at: string;
+    }[]>(`/attendance-validation/history${query}`);
+  },
+  getValidationDetail: (cellId: number, date: string) =>
+    request<{ user_id: number; user_name: string; user_phone?: string; was_confirmed: boolean }[]>(
+      `/attendance-validation/detail/${cellId}/${date}`
+    ),
 
   // Cells
   getCells: () => request<Cell[]>('/cells'),

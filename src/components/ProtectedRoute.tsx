@@ -5,16 +5,21 @@ import type { ReactNode } from 'react';
 interface ProtectedRouteProps {
   children?: ReactNode;
   requireAdmin?: boolean;
+  requireAdminOrLeader?: boolean;
 }
 
-export default function ProtectedRoute({ children, requireAdmin }: ProtectedRouteProps) {
-  const { user, isAdmin } = useAuth();
+export default function ProtectedRoute({ children, requireAdmin, requireAdminOrLeader }: ProtectedRouteProps) {
+  const { user, isAdmin, isAdminOrLeader } = useAuth();
 
   if (!user) {
     return <Navigate to="/" replace />;
   }
 
   if (requireAdmin && !isAdmin) {
+    return <Navigate to="/cronograma" replace />;
+  }
+
+  if (requireAdminOrLeader && !isAdminOrLeader) {
     return <Navigate to="/cronograma" replace />;
   }
 

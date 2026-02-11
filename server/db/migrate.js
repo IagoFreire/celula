@@ -168,6 +168,59 @@ CREATE TABLE IF NOT EXISTS schedule_cancellations (
 );
 
 CREATE INDEX IF NOT EXISTS idx_schedule_cancellations_cell_date ON schedule_cancellations(cell_id, date);
+
+-- Migração: role leader e leader_id na cells
+DO $$ BEGIN
+  -- Permitir role 'leader' (alterar check constraint se existir)
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'role'
+  ) THEN
+    -- Role é VARCHAR sem check, então já aceita 'leader'
+    NULL;
+  END IF;
+END $$;
+
+-- Adicionar leader_id na tabela cells
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name = 'cells' AND column_name = 'leader_id'
+  ) THEN
+    ALTER TABLE cells ADD COLUMN leader_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_cells_leader_id ON cells(leader_id);
+
+-- ========================================
+-- Tabela: meeting_attendance (presenças em reuniões geradas)
+-- ========================================
+CREATE TABLE IF NOT EXISTS meeting_attendance (
+  id SERIAL PRIMARY KEY,
+  cell_id INTEGER NOT NULL REFERENCES cells(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  confirmed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(cell_id, date, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_meeting_attendance_cell_date ON meeting_attendance(cell_id, date);
+CREATE INDEX IF NOT EXISTS idx_meeting_attendance_user ON meeting_attendance(user_id);
+
+-- ========================================
+-- Tabela: attendance_validation (validação real de presença pelo líder)
+-- ========================================
+CREATE TABLE IF NOT EXISTS attendance_validation (
+  id SERIAL PRIMARY KEY,
+  cell_id INTEGER NOT NULL REFERENCES cells(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  was_confirmed BOOLEAN NOT NULL DEFAULT false,
+  validated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  validated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(cell_id, date, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_attendance_validation_cell_date ON attendance_validation(cell_id, date);
+CREATE INDEX IF NOT EXISTS idx_attendance_validation_user ON attendance_validation(user_id);
 `;
 
 async function migrate() {

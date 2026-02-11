@@ -26,4 +26,11 @@ export function requireAdmin(req, res, next) {
   next();
 }
 
+export function requireAdminOrLeader(req, res, next) {
+  if (req.user.role !== 'admin' && req.user.role !== 'leader') {
+    return res.status(403).json({ error: 'Acesso restrito a administradores e líderes' });
+  }
+  next();
+}
+
 export { JWT_SECRET };

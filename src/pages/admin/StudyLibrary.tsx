@@ -57,7 +57,7 @@ export default function AdminStudyLibrary() {
       <div className="flex items-center justify-between mb-8 animate-fade-in">
         <div>
           <h1 className="page-title flex items-center gap-2"><Library className="w-6 h-6 text-gold-500" />Biblioteca de Estudos</h1>
-          <p className="page-subtitle">Gerencie os materiais bíblicos</p>
+          <p className="page-subtitle">Gerencie os materiais de estudo</p>
         </div>
         <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary">
           <Plus className="w-4 h-4" /><span className="hidden sm:inline">Novo Estudo</span>

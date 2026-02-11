@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { db } from '../database.js';
-import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { authenticateToken, requireAdminOrLeader } from '../middleware/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, '..', '..', 'uploads', 'studies');
@@ -62,7 +62,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-router.post('/', authenticateToken, requireAdmin, upload.single('file'), async (req, res) => {
+// Admin e líderes podem criar estudos
+router.post('/', authenticateToken, requireAdminOrLeader, upload.single('file'), async (req, res) => {
   try {
     const { title, description, content, category, keywords } = req.body;
     if (!title) return res.status(400).json({ error: 'Título é obrigatório' });
@@ -79,7 +80,8 @@ router.post('/', authenticateToken, requireAdmin, upload.single('file'), async (
   }
 });
 
-router.put('/:id', authenticateToken, requireAdmin, upload.single('file'), async (req, res) => {
+// Admin e líderes podem editar estudos
+router.put('/:id', authenticateToken, requireAdminOrLeader, upload.single('file'), async (req, res) => {
   try {
     const { title, description, content, category, keywords } = req.body;
     const existing = await db.getStudyById(Number(req.params.id));
@@ -104,7 +106,8 @@ router.put('/:id', authenticateToken, requireAdmin, upload.single('file'), async
   }
 });
 
-router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
+// Admin e líderes podem excluir estudos
+router.delete('/:id', authenticateToken, requireAdminOrLeader, async (req, res) => {
   try {
     const study = await db.deleteStudy(Number(req.params.id));
     if (study?.file_path) {

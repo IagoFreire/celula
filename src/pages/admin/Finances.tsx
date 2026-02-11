@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { api } from '../../api';
+import { useAuth } from '../../contexts/AuthContext';
 import type { Finance, FinanceSummary, Cell, FinanceFilters, FinanceForm } from '../../types';
 import {
   Plus, Pencil, Trash2, DollarSign, TrendingUp, TrendingDown, Wallet, X, Save,
@@ -10,6 +11,7 @@ const INCOME_CATEGORIES = ['Oferta', 'Dízimo', 'Doação', 'Evento', 'Outros'];
 const EXPENSE_CATEGORIES = ['Aluguel', 'Material', 'Alimentação', 'Transporte', 'Manutenção', 'Outros'];
 
 export default function AdminFinances() {
+  const { isAdmin, isLeader } = useAuth();
   const [transactions, setTransactions] = useState<Finance[]>([]);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [cells, setCells] = useState<Cell[]>([]);
@@ -56,7 +58,7 @@ export default function AdminFinances() {
       <div className="flex items-center justify-between mb-8 animate-fade-in">
         <div>
           <h1 className="page-title flex items-center gap-2"><DollarSign className="w-6 h-6 text-gold-500" />Finanças</h1>
-          <p className="page-subtitle">Controle financeiro das células</p>
+          <p className="page-subtitle">{isLeader ? 'Controle financeiro da sua célula' : 'Controle financeiro das células'}</p>
         </div>
         <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary">
           <Plus className="w-4 h-4" /><span className="hidden sm:inline">Nova Transação</span>
@@ -85,9 +87,12 @@ export default function AdminFinances() {
       {/* Filters */}
       <div className="card mb-6">
         <div className="flex items-center gap-2 mb-3"><Filter className="w-4 h-4 text-gold-600" /><span className="text-sm font-semibold text-dark-400">Filtros</span></div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className={`grid gap-3 ${isAdmin ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
           <select value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })} className="input-field text-sm"><option value="">Todos os tipos</option><option value="income">Entradas</option><option value="expense">Saídas</option></select>
-          <select value={filters.cell_id} onChange={(e) => setFilters({ ...filters, cell_id: e.target.value })} className="input-field text-sm"><option value="">Todas células</option>{cells.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+          {/* Admin vê seletor de célula; líder já está filtrado pelo backend */}
+          {isAdmin && (
+            <select value={filters.cell_id} onChange={(e) => setFilters({ ...filters, cell_id: e.target.value })} className="input-field text-sm"><option value="">Todas células</option>{cells.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+          )}
           <input type="date" value={filters.start_date} onChange={(e) => setFilters({ ...filters, start_date: e.target.value })} className="input-field text-sm" />
           <input type="date" value={filters.end_date} onChange={(e) => setFilters({ ...filters, end_date: e.target.value })} className="input-field text-sm" />
         </div>
@@ -106,7 +111,10 @@ export default function AdminFinances() {
               <div><label className="block text-sm font-medium text-dark-400 mb-1.5">Categoria *</label><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="input-field" required><option value="">Selecione...</option>{categories.map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
               <div><label className="block text-sm font-medium text-dark-400 mb-1.5">Valor (R$) *</label><input type="number" step="0.01" min="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="input-field" required placeholder="0,00" /></div>
               <div><label className="block text-sm font-medium text-dark-400 mb-1.5">Data *</label><input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="input-field" required /></div>
-              <div><label className="block text-sm font-medium text-dark-400 mb-1.5">Célula</label><select value={form.cell_id} onChange={(e) => setForm({ ...form, cell_id: e.target.value })} className="input-field"><option value="">Geral</option>{cells.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+              {/* Admin vê seletor de célula; líder usa sua célula automaticamente */}
+              {isAdmin && (
+                <div><label className="block text-sm font-medium text-dark-400 mb-1.5">Célula</label><select value={form.cell_id} onChange={(e) => setForm({ ...form, cell_id: e.target.value })} className="input-field"><option value="">Geral</option>{cells.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+              )}
               <div><label className="block text-sm font-medium text-dark-400 mb-1.5">Descrição</label><input type="text" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-field" placeholder="Detalhes..." /></div>
             </div>
             <div className="flex gap-2"><button type="submit" className="btn-primary"><Save className="w-4 h-4" />{editingId ? 'Atualizar' : 'Registrar'}</button><button type="button" onClick={resetForm} className="btn-secondary">Cancelar</button></div>
