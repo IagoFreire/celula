@@ -42,7 +42,8 @@ jobs:
             cd /var/www/app/celula
             
             echo "📥 Puxando código novo do Git..."
-            git pull origin ${{ github.ref_name }}
+            git fetch origin ${{ github.ref_name }}
+            git reset --hard origin/${{ github.ref_name }}
 
             echo "⚙️ Configurando Backend..."
             cd server
